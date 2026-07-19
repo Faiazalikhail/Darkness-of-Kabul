@@ -33,9 +33,9 @@ flowchart LR
 
 The important rule is that the preview and real projectile call the **same math library**. If we write the equation twice, the preview can drift away from the real shot.
 
-## Planned source structure
+## Implemented source structure
 
-Create this structure after Unreal generates the `DarknessOfKabul` module:
+The Unreal module now contains this structure:
 
 ```text
 Source/DarknessOfKabul/
@@ -51,6 +51,7 @@ Source/DarknessOfKabul/
 |   |-- Objectives/DOKEscortController.h
 |   |-- Pickups/DOKStonePickup.h
 |   |-- Game/DOKGameMode.h
+|   |-- Game/DOKPlayerController.h
 |   `-- UI/DOKHUDWidget.h
 `-- Private/
     |-- Character/DOKCharacter.cpp
@@ -61,6 +62,8 @@ Source/DarknessOfKabul/
     |-- Objectives/DOKEscortController.cpp
     |-- Pickups/DOKStonePickup.cpp
     |-- Game/DOKGameMode.cpp
+    |-- Game/DOKPlayerController.cpp
+    |-- Tests/DOKKinematicsTests.cpp
     `-- UI/DOKHUDWidget.cpp
 ```
 
@@ -78,6 +81,7 @@ Source/DarknessOfKabul/
 | `ADOKEscortController` | route stages, encounter gates, flock danger, home arrival | projectile physics |
 | `ADOKStonePickup` | add ammo once and disappear | slingshot flight logic |
 | `ADOKGameMode` | level start, win, loss, restart | visual HUD layout |
+| `ADOKPlayerController` | install Enhanced Input mapping contexts | movement or gameplay rules |
 | `UDOKHUDWidget` | display current values | authoritative gameplay rules |
 
 ## The slingshot shot sequence

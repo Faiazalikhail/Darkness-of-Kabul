@@ -1,0 +1,45 @@
+{
+  "FileVersion": 3,
+  "EngineAssociation": "5.6",
+  "Category": "Games",
+  "Description": "A first-person physics project built around a code-driven slingshot projectile.",
+  "Modules": [
+    {
+      "Name": "DarknessOfKabul",
+      "Type": "Runtime",
+      "LoadingPhase": "Default",
+      "AdditionalDependencies": [
+        "Engine",
+        "EnhancedInput",
+        "UMG",
+        "AIModule",
+        "NavigationSystem"
+      ]
+    }
+  ],
+  "Plugins": [
+    {
+      "Name": "EnhancedInput",
+      "Enabled": true
+    },
+    {
+      "Name": "ModelingToolsEditorMode",
+      "Enabled": true,
+      "TargetAllowList": [
+        "Editor"
+      ]
+    },
+    {
+      "Name": "Niagara",
+      "Enabled": true
+    },
+    {
+      "Name": "InterchangeImportCineware",
+      "Enabled": false
+    },
+    {
+      "Name": "CinewareForUnreal",
+      "Enabled": false
+    }
+  ]
+}

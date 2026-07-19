@@ -2,7 +2,7 @@
 
 A small first-person Unreal Engine 5.6.1 level for **VGP203 - Physics for Game Development**. The main graded feature is a Y-shaped slingshot whose stone trajectory, velocity, gravity, and swept collision are calculated in C++.
 
-> Current stage: repository and architecture foundation. The Unreal `.uproject` has not been created yet.
+> Current stage: the Unreal 5.6 C++ project, complete foundation class set, Enhanced Input assets, and editable First Person graybox map are implemented and build successfully.
 
 ## Minimum project goal
 
@@ -11,10 +11,11 @@ In one 10-15 minute level, the player escorts livestock from a pasture to a home
 ## Start here
 
 1. Read [Setup and Workflow](Documentation/SETUP_AND_WORKFLOW.md).
-2. Read [Project Architecture](Documentation/PROJECT_ARCHITECTURE.md).
-3. Use [Unreal C++ Learning Notes](Documentation/UNREAL_CPP_LEARNING_NOTES.md) whenever we add a class.
-4. Check [Development Log](Documentation/DEVLOG.md) to see what changed and why.
-5. Keep the original [Game Design Document](Documentation/Darkness%20of%20Kabul%20GDD.docx) as the design source of truth.
+2. Follow [Your First Unreal Editor Session](Documentation/EDITOR_START_HERE.md).
+3. Read [Project Architecture](Documentation/PROJECT_ARCHITECTURE.md).
+4. Use [Unreal C++ Learning Notes](Documentation/UNREAL_CPP_LEARNING_NOTES.md) whenever we add a class.
+5. Check [Development Log](Documentation/DEVLOG.md) to see what changed and why.
+6. Keep the original [Game Design Document](Documentation/Darkness%20of%20Kabul%20GDD.docx) as the design source of truth.
 
 ## Repository rule
 

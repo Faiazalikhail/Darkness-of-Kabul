@@ -12,7 +12,7 @@ Checked on **July 18, 2026**:
 | Visual Studio Community 2022 | Yes | Write, compile, and debug C++ |
 | Game development with C++ workload | Yes | Installs the MSVC compiler and game-development tools |
 | MSVC x64 compiler | Yes | Turns our C++ files into a Windows game module |
-| Windows SDK 10.0.26100 | Yes | Windows headers and libraries used by the build |
+| Windows SDK 10.0.22621 and 10.0.26100 | Yes | Windows headers and libraries; UE 5.6 selected 10.0.22621 for the verified build |
 | Git | Yes | Records project history and supports teamwork |
 | Git LFS 3.7.1 | Yes | Stores large Unreal binary assets safely |
 | Fab and Bridge | Yes | Finds and imports permitted external assets |
@@ -56,21 +56,11 @@ What they mean:
 2. `git lfs pull` downloads the real contents of tracked binary assets.
 3. `git status` shows local changes before we work.
 
-## Creating the Unreal project
+## Opening the Unreal project
 
-The repository does not contain a `.uproject` yet. Create it in this repository root so we do not end up with a second nested `DarknessOfKabul` folder.
+The C++ project now exists. Open `DarknessOfKabul.uproject` with Unreal Engine 5.6.1. The project starts in Epic's editable First Person graybox map at `/Game/FirstPerson/Lvl_FirstPerson` and uses our C++ `ADOKGameMode`, `ADOKPlayerController`, and `ADOKCharacter`.
 
-Use these choices in Unreal Engine 5.6.1:
-
-1. Games -> First Person.
-2. Project type: **C++**.
-3. Target platform: **Desktop**.
-4. Quality preset: **Maximum** for the class project; reduce later if performance becomes a problem.
-5. Starter Content: optional. Skip it if the external environment pack already covers the blockout needs.
-6. Project name: `DarknessOfKabul` with no spaces.
-7. Location: the parent folder of this repository only if Unreal will create directly into `Darkness-of-Kabul`; carefully check the previewed path before clicking Create.
-
-Stop if Unreal tries to create `Darkness-of-Kabul/DarknessOfKabul/`. We want the `.uproject`, `Config`, `Content`, and `Source` folders directly beside this README.
+If Unreal asks to rebuild modules, choose **Yes**. A successful Development Editor build has already been verified on this machine. Follow `EDITOR_START_HERE.md` before changing the starter map.
 
 ## Plugins and modules: what is the difference?
 
@@ -80,7 +70,7 @@ Planned built-in features:
 
 | Feature | Type | Use now? | Reason |
 |---|---|---:|---|
-| Enhanced Input | Plugin + module | Yes | Input Actions for move, look, aim, draw, interact, and restart |
+| Enhanced Input | Plugin + module | Yes | Input Actions and mapping contexts for movement, look, and jump |
 | UMG | Engine module | Yes | HUD widgets for stones, draw strength, health, danger, and objectives |
 | AI Module | Engine module | Later | Basic AI controller support for zombies |
 | Navigation System | Engine module | Later | Lets simple zombies move on a NavMesh |
@@ -89,6 +79,8 @@ Planned built-in features:
 | Gameplay Ability System | Plugin | No | Too much framework for one weapon and one level |
 | StateTree | Plugin | No | A small explicit zombie state enum is easier to build and explain |
 | Cable / Chaos rope simulation | Plugin/system | No | The rubber bands only need visual animation; draw time controls launch speed |
+
+Aim, fire, sprint, interact, trajectory toggle, and restart are currently bound directly to keyboard/mouse keys in `ADOKCharacter.cpp`. This makes the first build immediately playable without asking you to create six more binary Input Action assets. We can migrate those actions to Enhanced Input assets after the first map and character Blueprint are stable.
 
 Only add a module to `DarknessOfKabul.Build.cs` when C++ actually uses it. Fewer dependencies mean faster builds and fewer confusing errors.
 
