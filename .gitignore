@@ -1,0 +1,48 @@
+# Darkness of Kabul - Unreal Engine generated files
+# These files are created again by Unreal Engine or Visual Studio.
+
+# Unreal build output and caches
+Binaries/
+Build/*/FileOpenOrder/
+DerivedDataCache/
+Intermediate/
+Saved/
+
+# Keep intentional build resources such as icons when they are added later.
+!Build/
+!Build/**/
+!Build/**/*.ico
+!Build/**/*.png
+
+# Visual Studio / Rider / VS Code generated files
+.vs/
+.idea/
+.vscode/
+*.sln
+*.suo
+*.opensdf
+*.sdf
+*.VC.db
+*.VC.opendb
+*.code-workspace
+
+# Compiled objects and debug files
+*.obj
+*.pdb
+*.idb
+*.ipch
+*.tlog
+*.log
+
+# Unreal crash and profiling output
+crashinfo--*
+*.dmp
+*.utrace
+
+# Local operating-system files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Local scratch folders used by tools
+.codex-doc-review/
