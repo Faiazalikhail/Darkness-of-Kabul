@@ -13,6 +13,8 @@
 
 APlayerCharacter::APlayerCharacter()
 {
+	PrimaryActorTick.bCanEverTick = true;
+
 	// Configure rotation settings
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationYaw = true;
@@ -21,10 +23,13 @@ APlayerCharacter::APlayerCharacter()
 	GetCharacterMovement()->GetNavAgentPropertiesRef().bCanCrouch = true;
 	GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
 	GetCharacterMovement()->MaxWalkSpeedCrouched = CrouchWalkSpeed;
-	GetCharacterMovement()->JumpZVelocity = 500.0f;
-	GetCharacterMovement()->AirControl = 0.35f;
-	GetCharacterMovement()->MaxAcceleration = 1800.0f;
-	GetCharacterMovement()->BrakingDecelerationWalking = 1400.0f;
+	GetCharacterMovement()->JumpZVelocity = 460.0f;
+	GetCharacterMovement()->GravityScale = 1.25f;
+	GetCharacterMovement()->AirControl = 0.18f;
+	GetCharacterMovement()->MaxAcceleration = 1300.0f;
+	GetCharacterMovement()->BrakingDecelerationWalking = 1800.0f;
+	GetCharacterMovement()->GroundFriction = 9.0f;
+	GetCharacterMovement()->FallingLateralFriction = 0.25f;
 
 	// Create and setup the First Person Camera
 	FirstPersonCameraComponent = CreateDefaultSubobject<UCameraComponent>(TEXT("FirstPersonCamera"));
@@ -66,7 +71,37 @@ APlayerCharacter::APlayerCharacter()
 void APlayerCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+	CameraRestingLocation = FirstPersonCameraComponent->GetRelativeLocation();
+	CameraRestingRotation = FirstPersonCameraComponent->GetRelativeRotation();
 	UpdateLocomotionState();
+}
+
+void APlayerCharacter::Tick(const float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	if (LandingShakeStrength <= 0.0f)
+	{
+		return;
+	}
+
+	LandingShakeElapsed += DeltaSeconds;
+	const float NormalizedTime = LandingShakeElapsed / LandingShakeDuration;
+	if (NormalizedTime >= 1.0f)
+	{
+		LandingShakeStrength = 0.0f;
+		FirstPersonCameraComponent->SetRelativeLocation(CameraRestingLocation);
+		FirstPersonCameraComponent->SetRelativeRotation(CameraRestingRotation);
+		return;
+	}
+
+	// A fast damped dip gives impact weight without disturbing player aim.
+	const float Envelope = FMath::Square(1.0f - NormalizedTime);
+	const float Wave = FMath::Sin(NormalizedTime * 3.0f * UE_PI);
+	const float CameraDrop = -MaximumLandingCameraDrop * LandingShakeStrength * Envelope * FMath::Abs(Wave);
+	const float CameraRoll = 0.7f * LandingShakeStrength * Envelope * Wave;
+	FirstPersonCameraComponent->SetRelativeLocation(CameraRestingLocation + FVector(0.0f, 0.0f, CameraDrop));
+	FirstPersonCameraComponent->SetRelativeRotation(CameraRestingRotation + FRotator(0.0f, 0.0f, CameraRoll));
 }
 
 void APlayerCharacter::PawnClientRestart()
@@ -90,6 +125,21 @@ void APlayerCharacter::PawnClientRestart()
 				Subsystem->AddMappingContext(MouseLookMappingContext, 1);
 			}
 		}
+	}
+}
+
+void APlayerCharacter::Landed(const FHitResult& Hit)
+{
+	const float ImpactSpeed = FMath::Max(0.0f, -GetVelocity().Z);
+	Super::Landed(Hit);
+
+	if (ImpactSpeed >= LandingShakeMinimumSpeed)
+	{
+		LandingShakeElapsed = 0.0f;
+		LandingShakeStrength = FMath::GetMappedRangeValueClamped(
+			FVector2D(LandingShakeMinimumSpeed, 1100.0f),
+			FVector2D(0.25f, 1.0f),
+			ImpactSpeed);
 	}
 }
 
@@ -121,8 +171,8 @@ void APlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		}
 	}
 
-	// Milestone-one actions stay direct and readable. They can become Input
-	// Action assets later without changing the movement functions themselves.
+	// These actions stay direct and readable. They can become Input
+	// Action assets later
 	PlayerInputComponent->BindKey(EKeys::LeftShift, IE_Pressed, this, &APlayerCharacter::StartSprint);
 	PlayerInputComponent->BindKey(EKeys::LeftShift, IE_Released, this, &APlayerCharacter::StopSprint);
 	PlayerInputComponent->BindKey(EKeys::LeftControl, IE_Pressed, this, &APlayerCharacter::StartCrouch);
@@ -187,7 +237,10 @@ void APlayerCharacter::StopSprint()
 void APlayerCharacter::StartCrouch()
 {
 	bSprintHeld = false;
-	Crouch();
+	if (GetCharacterMovement()->IsMovingOnGround())
+	{
+		Crouch();
+	}
 }
 
 void APlayerCharacter::StopCrouch()
@@ -233,7 +286,7 @@ bool APlayerCharacter::TryClimb()
 {
 	UWorld* World = GetWorld();
 	UCapsuleComponent* Capsule = GetCapsuleComponent();
-	if (!World || !Capsule || bIsCrouched)
+	if (!World || !Capsule || bIsCrouched || !GetCharacterMovement()->IsMovingOnGround())
 	{
 		return false;
 	}
@@ -291,7 +344,7 @@ bool APlayerCharacter::TryClimb()
 		return false;
 	}
 
-	// A future animation can interpolate to this target. Milestone one uses a
+	// A future animation can interpolate to this target. This prototype uses a
 	// swept move so the capsule never teleports through blocking geometry.
 	GetCharacterMovement()->StopMovementImmediately();
 	FHitResult MoveHit;

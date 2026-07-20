@@ -13,8 +13,8 @@ struct FInputActionValue;
 /**
  * Blueprint base for the first-person player.
  *
- * Milestone one owns locomotion only: walk, look, jump, sprint, crouch, and
- * a simple collision-safe ledge climb. Weapon and combat work stay deferred.
+ * Owns first-person locomotion: walk, look, jump, sprint, crouch, and a
+ * simple collision-safe ledge climb. Weapon and combat logic live elsewhere.
  */
 UCLASS(Blueprintable)
 class DARKNESSOFKABUL_API APlayerCharacter : public ACharacter
@@ -33,8 +33,10 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void Tick(float DeltaSeconds) override;
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 	virtual void PawnClientRestart() override;
+	virtual void Landed(const FHitResult& Hit) override;
 	virtual void OnStartCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust) override;
 	virtual void OnEndCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust) override;
 
@@ -53,13 +55,13 @@ private:
 	/* --- LOCOMOTION TUNING --- */
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Speed", meta = (AllowPrivateAccess = "true", ClampMin = "0"))
-	float WalkSpeed = 400.0f;
+	float WalkSpeed = 340.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Speed", meta = (AllowPrivateAccess = "true", ClampMin = "0"))
-	float SprintSpeed = 650.0f;
+	float SprintSpeed = 520.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Speed", meta = (AllowPrivateAccess = "true", ClampMin = "0"))
-	float CrouchWalkSpeed = 180.0f;
+	float CrouchWalkSpeed = 150.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Noise", meta = (AllowPrivateAccess = "true", ClampMin = "0"))
 	float WalkNoiseMultiplier = 1.0f;
@@ -83,8 +85,22 @@ private:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Climb", meta = (AllowPrivateAccess = "true", ClampMin = "1"))
 	float ClimbLandingInset = 45.0f;
 
+	/** A normal same-height jump stays below this; short drops trigger feedback. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Camera|Landing", meta = (AllowPrivateAccess = "true", ClampMin = "0"))
+	float LandingShakeMinimumSpeed = 480.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Camera|Landing", meta = (AllowPrivateAccess = "true", ClampMin = "0.05"))
+	float LandingShakeDuration = 0.32f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Camera|Landing", meta = (AllowPrivateAccess = "true", ClampMin = "0"))
+	float MaximumLandingCameraDrop = 6.0f;
+
 	float MovementNoiseMultiplier = 1.0f;
 	bool bSprintHeld = false;
+	FVector CameraRestingLocation = FVector::ZeroVector;
+	FRotator CameraRestingRotation = FRotator::ZeroRotator;
+	float LandingShakeElapsed = 0.0f;
+	float LandingShakeStrength = 0.0f;
 
 
 	/* --- INPUT ASSETS --- */

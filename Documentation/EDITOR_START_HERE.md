@@ -1,27 +1,31 @@
-# Milestone One: Editor Start
+# Editor and Level Guide
 
 1. Open `DarknessOfKabul.uproject` in Unreal Engine 5.6.1.
-2. Confirm the map tab is `L_TargetPractice`.
+2. Confirm the open map is `L_TargetPractice`.
 3. Press **Play** and click the viewport.
 4. Test WASD, mouse look, Space, Left Shift, and Left Ctrl.
 
-## Editing the course
+## Editing the traversal area
 
-Select `TraversalCourse` in the World Outliner. Its actor transform is editable like any other Unreal actor. The course contains named components:
+Select `TraversalCourse` in the World Outliner. Its actor transform is editable like any other Unreal actor. It contains:
 
-- `JumpHurdle`;
-- `CrouchTunnelRoof` and two tunnel walls;
-- `LowClimbBlock`, `MediumClimbBlock`, and `HighClimbBlock`;
-- `GuideText`.
+- three progressively higher jump hurdles;
+- a crouch tunnel with roof and walls;
+- `LowClimbBlock`, `MediumClimbBlock`, and `HighClimbBlock` as valid climbs;
+- `ImpossibleClimbBlock` as a deliberately invalid climb;
+- `LandingDropPlatform` for landing-impact tests;
+- floating guide text for each section.
 
-The floating text is deliberately preserved. To edit individual course components visually, create a Blueprint child of `TraversalCourse` and adjust the named components in the Blueprint viewport. You may also replace any component with ordinary cubes or other level objects.
-
-Keep this map as a readable movement test. Do not add projectiles, enemies, objectives, animals, or story events during milestone one.
+To adjust individual components visually, create a Blueprint child of `TraversalCourse` and edit the named components in the Blueprint viewport. You can also replace the cubes with ordinary level geometry while keeping the same test heights.
 
 ## Expected movement
 
-- Sprint is faster than normal walking.
+- Walking has gradual acceleration and firm braking.
+- Sprinting is faster but still controlled.
 - Crouching reduces the collision capsule and uses the slowest speed.
-- Crouch movement exposes the lowest noise multiplier for future audio or AI work.
-- Space jumps normally when no ledge is detected.
-- Space climbs when a nearby ledge is within the configured 40-140 cm range and has enough landing clearance.
+- Space jumps when no valid ledge is detected.
+- Space climbs a nearby ledge between 40 and 140 cm when the top is walkable and the capsule has room.
+- The 180 cm block must reject climbing.
+- Dropping from the raised platform produces a short camera impact response.
+
+Keep this map readable as a movement and traversal test area.

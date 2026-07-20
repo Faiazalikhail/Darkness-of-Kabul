@@ -1,25 +1,34 @@
-# Milestone-One Architecture
+# Project Architecture
 
-## Current flow
+## Runtime flow
 
 ```mermaid
 flowchart LR
-    Input[Enhanced Input and direct keys] --> Player[APlayerCharacter]
+    Hardware[Keyboard and mouse] --> Mapping[Enhanced Input mappings]
+    Mapping --> Player[APlayerCharacter]
     Player --> Movement[UCharacterMovementComponent]
-    Movement --> Collision[Character capsule and world collision]
-    Course[ATraversalCourse] --> Objects[Editable mesh and text components]
+    Movement --> Collision[Capsule and world collision]
+    Course[ATraversalCourse] --> Geometry[Editable mesh and text components]
 ```
 
-## Responsibilities
+## Class responsibilities
 
-| Class | Current responsibility |
+| Class | Responsibility |
 |---|---|
-| `APlayerCharacter` | camera, input, walking, looking, jumping, sprinting, crouching, movement noise value, and ledge climbing |
-| `AKabulPlayerController` | future player-only UI and controller responsibilities; intentionally empty now |
-| `AKabulGameMode` | selects the milestone-one player pawn and controller |
-| `ATraversalCourse` | editable movement-course geometry and floating guide text only |
-| projectile, slingshot, pickup, zombie, and HUD classes | commented future extension points; no current gameplay behavior |
+| `APlayerCharacter` | camera, input binding, walking, looking, jumping, sprinting, crouching, landing feedback, movement-noise value, and ledge climbing |
+| `AKabulPlayerController` | player-specific UI and controller responsibilities when needed |
+| `AKabulGameMode` | selects the default pawn and player controller |
+| `ATraversalCourse` | editable traversal-test geometry and floating guide text |
+| `USlingshotComponent` | isolated slingshot behavior; currently a small extension point |
+| `AStoneProjectile`, `AStonePickup`, `AZombieCharacter`, and `UKabulHUDWidget` | separate gameplay domains that do not belong in locomotion code |
 
-## Scope boundary
+## Ownership rules
 
-Milestone one proves movement and explains its physics. Combat and full-game systems must not be added until a later milestone explicitly begins.
+- The character translates player intent into movement requests.
+- `UCharacterMovementComponent` owns acceleration, velocity, gravity, floor detection, and collision-aware motion.
+- The level owns environment layout and art.
+- `ATraversalCourse` supplies reusable test geometry, not game rules.
+- Game-wide rules belong in `AKabulGameMode`.
+- UI belongs in the HUD/widget layer, not in the movement class.
+
+This separation keeps each system testable and prevents movement, combat, level geometry, and UI from becoming one large class.

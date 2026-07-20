@@ -58,7 +58,7 @@ What they mean:
 
 ## Opening the Unreal project
 
-Open `DarknessOfKabul.uproject` with Unreal Engine 5.6.1. The project starts in `/Game/Maps/L_TargetPractice` and uses `AKabulGameMode`, `AKabulPlayerController`, and `APlayerCharacter` for milestone-one movement.
+Open `DarknessOfKabul.uproject` with Unreal Engine 5.6.1. The project starts in `/Game/Maps/L_TargetPractice` and uses `AKabulGameMode`, `AKabulPlayerController`, and `APlayerCharacter` for player movement.
 
 If Unreal asks to rebuild modules, choose **Yes**. A successful Development Editor build has already been verified on this machine. Follow `EDITOR_START_HERE.md` before changing the starter map.
 
@@ -80,7 +80,7 @@ Planned built-in features:
 | StateTree | Plugin | No | A small explicit zombie state enum is easier to build and explain |
 | Cable / Chaos rope simulation | Plugin/system | No | The rubber bands only need visual animation; draw time controls launch speed |
 
-Movement, look, and jump use the existing Enhanced Input assets. Sprint and crouch are intentionally direct key bindings in `PlayerCharacter.cpp` so the milestone remains small and readable. There is no firing input in the current player class.
+Movement, look, and jump use the existing Enhanced Input assets. Sprint and crouch are intentionally direct key bindings in `PlayerCharacter.cpp` so the input path remains small and readable. There is no firing input in the current player class.
 
 Only add a module to `DarknessOfKabul.Build.cs` when C++ actually uses it. Fewer dependencies mean faster builds and fewer confusing errors.
 
@@ -117,7 +117,7 @@ For every downloaded asset, record:
 - modifications made;
 - where it is used.
 
-Add those entries to a future `Documentation/ASSET_CREDITS.md`. Never assume an asset is allowed just because it can be downloaded.
+Add those entries to `Documentation/ASSET_CREDITS.md`. Never assume an asset is allowed just because it can be downloaded.
 
 ## If the project does not compile
 

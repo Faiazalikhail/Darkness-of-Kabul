@@ -1,28 +1,24 @@
-# Darkness of Kabul - Milestone One
+# Darkness of Kabul
 
-This branch contains only the first milestone: a controllable first-person character and an editable movement practice level in Unreal Engine 5.6.1.
+A first-person movement and traversal physics project built with Unreal Engine 5.6.1 and C++.
 
-## Implemented now
+## Current gameplay
 
-- walk and mouse look;
-- jump;
+- WASD movement and mouse look;
 - hold Shift to sprint;
-- hold Left Ctrl to crouch and crouch-walk more slowly;
-- a quiet-movement multiplier for future footsteps or AI hearing;
-- press Space near a suitable low ledge to climb it;
-- an editable course with a jump hurdle, crouch tunnel, three climb blocks, and floating instruction text.
+- hold Left Ctrl to crouch and move quietly;
+- Space to jump or climb a nearby valid ledge;
+- heavier acceleration, jumping, air control, and landing feedback;
+- an editable traversal area for jump, crouch, climb, blocked-climb, and landing tests.
 
 The project opens directly into `/Game/Maps/L_TargetPractice`.
 
-## Not implemented now
-
-There is no firing input, projectile motion, damage, target logic, enemy AI, escort system, objective flow, or complete game level in milestone one. The corresponding classes remain small commented extension points for future milestones.
-
 ## Start here
 
-1. Read [Editor Start Here](Documentation/EDITOR_START_HERE.md).
-2. Read [Movement Physics and Code](Documentation/MILESTONE_ONE_MOVEMENT.md).
-3. Read [Current Architecture](Documentation/PROJECT_ARCHITECTURE.md).
+1. [Open and test the level](Documentation/EDITOR_START_HERE.md).
+2. [Understand input and movement physics](Documentation/MOVEMENT_AND_INPUT.md).
+3. [Review the project architecture](Documentation/PROJECT_ARCHITECTURE.md).
+4. [Learn the Unreal C++ concepts](Documentation/UNREAL_CPP_LEARNING_NOTES.md).
 
 ## Controls
 
@@ -34,6 +30,6 @@ There is no firing input, projectile motion, damage, target logic, enemy AI, esc
 | Sprint | Hold Left Shift |
 | Crouch / quiet walk | Hold Left Ctrl |
 
-## Verification
+## Build verification
 
 `DarknessOfKabulEditor Win64 Development` builds successfully with Unreal Header Tool warnings treated as errors.

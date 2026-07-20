@@ -9,7 +9,7 @@ class UStaticMeshComponent;
 class UTextRenderComponent;
 
 /**
- * Editable milestone-one blockout made from ordinary Unreal components.
+ * Editable traversal blockout made from ordinary Unreal components.
  * This is level geometry only: it contains no targets, damage, or gameplay rules.
  */
 UCLASS(Blueprintable)
@@ -21,32 +21,56 @@ public:
 	ATraversalCourse();
 
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Milestone One|Components")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Traversal|Components")
 	TObjectPtr<USceneComponent> SceneRoot;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Milestone One|Course")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Traversal|Course")
 	TObjectPtr<UStaticMeshComponent> JumpHurdle;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Milestone One|Course")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Traversal|Course")
+	TObjectPtr<UStaticMeshComponent> JumpHurdleTwo;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Traversal|Course")
+	TObjectPtr<UStaticMeshComponent> JumpHurdleThree;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Traversal|Course")
 	TObjectPtr<UStaticMeshComponent> CrouchTunnelRoof;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Milestone One|Course")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Traversal|Course")
 	TObjectPtr<UStaticMeshComponent> CrouchTunnelLeftWall;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Milestone One|Course")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Traversal|Course")
 	TObjectPtr<UStaticMeshComponent> CrouchTunnelRightWall;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Milestone One|Course")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Traversal|Course")
 	TObjectPtr<UStaticMeshComponent> LowClimbBlock;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Milestone One|Course")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Traversal|Course")
 	TObjectPtr<UStaticMeshComponent> MediumClimbBlock;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Milestone One|Course")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Traversal|Course")
 	TObjectPtr<UStaticMeshComponent> HighClimbBlock;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Milestone One|Guide")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Traversal|Course")
+	TObjectPtr<UStaticMeshComponent> ImpossibleClimbBlock;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Traversal|Course")
+	TObjectPtr<UStaticMeshComponent> LandingDropPlatform;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Traversal|Guide")
 	TObjectPtr<UTextRenderComponent> GuideText;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Traversal|Guide")
+	TObjectPtr<UTextRenderComponent> JumpGuideText;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Traversal|Guide")
+	TObjectPtr<UTextRenderComponent> CrouchGuideText;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Traversal|Guide")
+	TObjectPtr<UTextRenderComponent> ClimbGuideText;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Traversal|Guide")
+	TObjectPtr<UTextRenderComponent> LandingGuideText;
 
 	// Future level work belongs in normal Unreal objects or Blueprint children:
 	// - visual materials and environment art;

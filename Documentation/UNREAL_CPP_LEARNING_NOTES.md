@@ -81,7 +81,7 @@ TObjectPtr<USceneComponent> Root;
 - **BeginPlay:** runs when gameplay begins; safe for runtime initialization.
 - **Tick:** runs every frame if enabled. It receives `DeltaTime`, the number of seconds since the previous frame.
 
-Our stone needs Tick for its custom flight update. Most other classes should avoid Tick unless they truly need it.
+The player uses Tick only while applying its short landing-camera response. Most classes should avoid Tick unless they truly need a per-frame update.
 
 ## Header includes and forward declarations
 
@@ -126,7 +126,15 @@ For the projectile, gravity is `FVector(0.0, 0.0, -980.0)` and the position form
 
 A trace asks the world whether a shape travelling from A to B hits something. We use a sphere trace instead of checking only the new stone position. The result is an `FHitResult` containing data such as actor, component, impact point, normal, physical material, and bone name.
 
-Collision **channels** answer “what kind of query is this?” Object types answer “what kind of thing is this?” We will define a clear stone/projectile response matrix instead of letting every asset use random defaults.
+Collision **channels** answer “what kind of query is this?” Object types answer “what kind of thing is this?” Define a clear response matrix instead of letting every asset use random defaults.
+
+## Unreal maps and assets are binary
+
+`.umap` and `.uasset` files are Unreal packages, not editable text files. A file existing on disk does not prove that Unreal can load it. Create or modify these packages in the Editor, then open or play-test them to verify them. Git LFS should track large binary assets so the repository does not fill with duplicated binary history.
+
+## Useful Git distinction
+
+If a `.git` directory already exists, the repository is already initialized. Running `git init` again does not create a separate history. Check `git status`, the current branch, and the configured remote before changing repository setup.
 
 ## Logging and debugging
 
