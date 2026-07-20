@@ -1,72 +1,61 @@
 #include "PlayerCharacter.h"
-
+#include "Camera/CameraComponent.h"
+#include "Components/CapsuleComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
-#include "Engine/LocalPlayer.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
-#include "InputAction.h"
-#include "InputActionValue.h"
-#include "InputMappingContext.h"
-#include "UObject/ConstructorHelpers.h"
 
 APlayerCharacter::APlayerCharacter()
 {
+	// Configure rotation settings
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationYaw = true;
 	bUseControllerRotationRoll = false;
 	GetCharacterMovement()->bOrientRotationToMovement = false;
 
-	static ConstructorHelpers::FObjectFinder<UInputMappingContext> DefaultContextObject(
-		TEXT("/Game/Input/IMC_Default.IMC_Default"));
-	DefaultMappingContext = DefaultContextObject.Object;
+	// Create and setup the First Person Camera
+	FirstPersonCameraComponent = CreateDefaultSubobject<UCameraComponent>(TEXT("FirstPersonCamera"));
+	FirstPersonCameraComponent->SetupAttachment(GetCapsuleComponent());
+	FirstPersonCameraComponent->SetRelativeLocation(FVector(-10.f, 0.f, 60.f)); // Position the camera
+	FirstPersonCameraComponent->bUsePawnControlRotation = true;
 
-	static ConstructorHelpers::FObjectFinder<UInputMappingContext> MouseContextObject(
-		TEXT("/Game/Input/IMC_MouseLook.IMC_MouseLook"));
-	MouseLookMappingContext = MouseContextObject.Object;
-
-	static ConstructorHelpers::FObjectFinder<UInputAction> MoveActionObject(
-		TEXT("/Game/Input/Actions/IA_Move.IA_Move"));
-	MoveAction = MoveActionObject.Object;
-
-	static ConstructorHelpers::FObjectFinder<UInputAction> LookActionObject(
-		TEXT("/Game/Input/Actions/IA_Look.IA_Look"));
-	LookAction = LookActionObject.Object;
-
-	static ConstructorHelpers::FObjectFinder<UInputAction> MouseLookActionObject(
-		TEXT("/Game/Input/Actions/IA_MouseLook.IA_MouseLook"));
-	MouseLookAction = MouseLookActionObject.Object;
-
-	static ConstructorHelpers::FObjectFinder<UInputAction> JumpActionObject(
-		TEXT("/Game/Input/Actions/IA_Jump.IA_Jump"));
-	JumpAction = JumpActionObject.Object;
+	// Create and setup the First Person Mesh (arms)
+	Mesh1P = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("CharacterMesh1P"));
+	Mesh1P->SetOnlyOwnerSee(true);
+	Mesh1P->SetupAttachment(FirstPersonCameraComponent);
+	Mesh1P->bCastDynamicShadow = false;
+	Mesh1P->CastShadow = false;
+	Mesh1P->SetRelativeLocation(FVector(-30.f, 0.f, -150.f));
 }
 
 void APlayerCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+}
 
-	const APlayerController* PlayerController = Cast<APlayerController>(Controller);
-	if (!PlayerController)
-	{
-		return;
-	}
+void APlayerCharacter::PawnClientRestart()
+{
+	Super::PawnClientRestart();
 
-	UEnhancedInputLocalPlayerSubsystem* InputSubsystem =
-		ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PlayerController->GetLocalPlayer());
-	if (!InputSubsystem)
+	// Register Input Mapping Contexts here to ensure the controller is fully ready
+	if (APlayerController* PlayerController = Cast<APlayerController>(GetController()))
 	{
-		return;
-	}
+		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PlayerController->GetLocalPlayer()))
+		{
+			Subsystem->ClearAllMappings();
 
-	if (DefaultMappingContext)
-	{
-		InputSubsystem->AddMappingContext(DefaultMappingContext, 0);
-	}
+			if (DefaultMappingContext)
+			{
+				Subsystem->AddMappingContext(DefaultMappingContext, 0);
+			}
 
-	if (MouseLookMappingContext)
-	{
-		InputSubsystem->AddMappingContext(MouseLookMappingContext, 1);
+			if (MouseLookMappingContext)
+			{
+				Subsystem->AddMappingContext(MouseLookMappingContext, 1);
+			}
+		}
 	}
 }
 
@@ -74,49 +63,57 @@ void APlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 
-	UEnhancedInputComponent* EnhancedInput = Cast<UEnhancedInputComponent>(PlayerInputComponent);
-	if (!EnhancedInput)
+	if (UEnhancedInputComponent* EnhancedInput = Cast<UEnhancedInputComponent>(PlayerInputComponent))
 	{
-		return;
-	}
+		if (MoveAction)
+		{
+			EnhancedInput->BindAction(MoveAction, ETriggerEvent::Triggered, this, &APlayerCharacter::Move);
+		}
 
-	if (MoveAction)
-	{
-		EnhancedInput->BindAction(MoveAction, ETriggerEvent::Triggered, this, &APlayerCharacter::Move);
-	}
+		if (LookAction)
+		{
+			EnhancedInput->BindAction(LookAction, ETriggerEvent::Triggered, this, &APlayerCharacter::Look);
+		}
 
-	if (LookAction)
-	{
-		EnhancedInput->BindAction(LookAction, ETriggerEvent::Triggered, this, &APlayerCharacter::Look);
-	}
+		if (MouseLookAction)
+		{
+			EnhancedInput->BindAction(MouseLookAction, ETriggerEvent::Triggered, this, &APlayerCharacter::Look);
+		}
 
-	if (MouseLookAction)
-	{
-		EnhancedInput->BindAction(MouseLookAction, ETriggerEvent::Triggered, this, &APlayerCharacter::Look);
-	}
-
-	if (JumpAction)
-	{
-		EnhancedInput->BindAction(JumpAction, ETriggerEvent::Started, this, &APlayerCharacter::StartJump);
-		EnhancedInput->BindAction(JumpAction, ETriggerEvent::Completed, this, &APlayerCharacter::EndJump);
+		if (JumpAction)
+		{
+			EnhancedInput->BindAction(JumpAction, ETriggerEvent::Started, this, &APlayerCharacter::StartJump);
+			EnhancedInput->BindAction(JumpAction, ETriggerEvent::Completed, this, &APlayerCharacter::EndJump);
+		}
 	}
 }
 
 void APlayerCharacter::Move(const FInputActionValue& Value)
 {
-	const FVector2D MovementValue = Value.Get<FVector2D>();
-	const FRotator ControlRotation = GetControlRotation();
-	const FRotator YawRotation(0.0, ControlRotation.Yaw, 0.0);
+	if (Controller != nullptr)
+	{
+		const FVector2D MovementValue = Value.Get<FVector2D>();
 
-	AddMovementInput(FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X), MovementValue.Y);
-	AddMovementInput(FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y), MovementValue.X);
+		const FRotator ControlRotation = GetControlRotation();
+		const FRotator YawRotation(0.0, ControlRotation.Yaw, 0.0);
+
+		const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
+		const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
+
+		AddMovementInput(ForwardDirection, MovementValue.Y);
+		AddMovementInput(RightDirection, MovementValue.X);
+	}
 }
 
 void APlayerCharacter::Look(const FInputActionValue& Value)
 {
-	const FVector2D LookValue = Value.Get<FVector2D>();
-	AddControllerYawInput(LookValue.X);
-	AddControllerPitchInput(LookValue.Y);
+	if (Controller != nullptr)
+	{
+		const FVector2D LookValue = Value.Get<FVector2D>();
+
+		AddControllerYawInput(LookValue.X);
+		AddControllerPitchInput(LookValue.Y);
+	}
 }
 
 void APlayerCharacter::StartJump()

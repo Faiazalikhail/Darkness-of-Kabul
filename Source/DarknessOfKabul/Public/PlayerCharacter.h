@@ -4,8 +4,10 @@
 #include "GameFramework/Character.h"
 #include "PlayerCharacter.generated.h"
 
-class UInputAction;
 class UInputMappingContext;
+class UInputAction;
+class UCameraComponent;
+class USkeletalMeshComponent;
 struct FInputActionValue;
 
 /**
@@ -27,28 +29,48 @@ class DARKNESSOFKABUL_API APlayerCharacter : public ACharacter
 public:
 	APlayerCharacter();
 
+	// Returns the first-person camera component
+	UCameraComponent* GetFirstPersonCameraComponent() const { return FirstPersonCameraComponent; }
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
+	virtual void PawnClientRestart() override;
 
 private:
-	UPROPERTY()
+	/* --- COMPONENTS --- */
+
+	/** First person camera */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UCameraComponent> FirstPersonCameraComponent;
+
+	/** First person mesh (arms), seen only by self */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mesh", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<USkeletalMeshComponent> Mesh1P;
+
+
+	/* --- INPUT ASSETS --- */
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input|Contexts", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputMappingContext> DefaultMappingContext;
 
-	UPROPERTY()
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input|Contexts", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputMappingContext> MouseLookMappingContext;
 
-	UPROPERTY()
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input|Actions", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputAction> MoveAction;
 
-	UPROPERTY()
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input|Actions", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputAction> LookAction;
 
-	UPROPERTY()
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input|Actions", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputAction> MouseLookAction;
 
-	UPROPERTY()
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input|Actions", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UInputAction> JumpAction;
+
+
+	/* --- INPUT FUNCTIONS --- */
 
 	void Move(const FInputActionValue& Value);
 	void Look(const FInputActionValue& Value);
