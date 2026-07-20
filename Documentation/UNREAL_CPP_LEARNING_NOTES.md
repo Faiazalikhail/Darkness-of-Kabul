@@ -10,10 +10,10 @@ Regular C++ still matters: classes, inheritance, pointers, references, `const`, 
 
 | Prefix | Meaning | Project example |
 |---|---|---|
-| `A` | Actor that can exist in a level/world | `ADOKStoneProjectile` |
-| `U` | `UObject`-based object or component | `UDOKSlingshotComponent` |
+| `A` | Actor that can exist in a level/world | `APlayerCharacter` |
+| `U` | `UObject`-based object or component | `UCharacterMovementComponent` |
 | `F` | Plain Unreal value type or struct | `FVector`, `FHitResult` |
-| `E` | Enum | `EDOKZombieState` |
+| `E` | Enum | `EAxis` |
 | `I` | Interface | only add if we truly need one |
 | `T` | Template/container type | `TArray<FVector>` |
 
@@ -23,7 +23,7 @@ These prefixes are part of Unreal’s naming and reflection expectations, not de
 
 ```cpp
 UCLASS()
-class DARKNESSOFKABUL_API ADOKStoneProjectile : public AActor
+class DARKNESSOFKABUL_API ATraversalCourse : public AActor
 {
 	GENERATED_BODY()
 };

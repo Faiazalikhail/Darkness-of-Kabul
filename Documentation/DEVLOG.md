@@ -2,6 +2,27 @@
 
 This is the project diary. It records what we changed, why we changed it, what we learned, and what remains. New entries go at the top.
 
+## 2026-07-20 - Milestone one scope correction
+
+### Implemented
+
+- Limited the active work to movement and an editable traversal blockout.
+- Added sprint, crouch, slower crouch walking, a future-facing noise multiplier, and simple ledge climbing.
+- Placed `TraversalCourse` in `L_TargetPractice` with a hurdle, crouch tunnel, climb blocks, and floating guide text.
+- Removed all firing input from the active player controls; projectile and enemy classes remain inactive future stubs.
+- Rewrote current documentation around milestone one and added a class-ready movement physics explanation.
+
+### Verified
+
+- `DarknessOfKabulEditor Win64 Development` builds successfully.
+- `L_TargetPractice` saves with the editable traversal course actor.
+
+### Next action
+
+Present and tune milestone-one movement only. Do not begin combat or full-game systems yet.
+
+The entries below are historical snapshots and do not describe the current milestone scope.
+
 ## 2026-07-19 - Playable Unreal C++ foundation
 
 ### Implemented

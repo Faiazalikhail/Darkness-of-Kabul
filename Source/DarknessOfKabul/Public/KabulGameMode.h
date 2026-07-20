@@ -12,4 +12,7 @@ UCLASS(Blueprintable)
 class DARKNESSOFKABUL_API AKabulGameMode : public AGameModeBase
 {
 	GENERATED_BODY()
+
+public:
+	AKabulGameMode();
 };

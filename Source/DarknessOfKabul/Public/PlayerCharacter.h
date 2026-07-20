@@ -13,13 +13,8 @@ struct FInputActionValue;
 /**
  * Blueprint base for the first-person player.
  *
- * Planned implementation order:
- * 1. Camera and first-person mesh components.
- * 2. Move, look, jump, sprint, crouch, and slide input.
- * 3. Aim and shoot input forwarded to USlingshotComponent.
- *
- * Gameplay code is intentionally deferred so each part can be built and
- * explained separately.
+ * Milestone one owns locomotion only: walk, look, jump, sprint, crouch, and
+ * a simple collision-safe ledge climb. Weapon and combat work stay deferred.
  */
 UCLASS(Blueprintable)
 class DARKNESSOFKABUL_API APlayerCharacter : public ACharacter
@@ -32,10 +27,16 @@ public:
 	// Returns the first-person camera component
 	UCameraComponent* GetFirstPersonCameraComponent() const { return FirstPersonCameraComponent; }
 
+	/** Multiplier reserved for future footsteps or AI hearing. Crouching is quietest. */
+	UFUNCTION(BlueprintPure, Category = "Movement|Noise")
+	float GetMovementNoiseMultiplier() const { return MovementNoiseMultiplier; }
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 	virtual void PawnClientRestart() override;
+	virtual void OnStartCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust) override;
+	virtual void OnEndCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust) override;
 
 private:
 	/* --- COMPONENTS --- */
@@ -47,6 +48,43 @@ private:
 	/** First person mesh (arms), seen only by self */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mesh", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USkeletalMeshComponent> Mesh1P;
+
+
+	/* --- LOCOMOTION TUNING --- */
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Speed", meta = (AllowPrivateAccess = "true", ClampMin = "0"))
+	float WalkSpeed = 400.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Speed", meta = (AllowPrivateAccess = "true", ClampMin = "0"))
+	float SprintSpeed = 650.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Speed", meta = (AllowPrivateAccess = "true", ClampMin = "0"))
+	float CrouchWalkSpeed = 180.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Noise", meta = (AllowPrivateAccess = "true", ClampMin = "0"))
+	float WalkNoiseMultiplier = 1.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Noise", meta = (AllowPrivateAccess = "true", ClampMin = "0"))
+	float SprintNoiseMultiplier = 1.5f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Noise", meta = (AllowPrivateAccess = "true", ClampMin = "0"))
+	float CrouchNoiseMultiplier = 0.25f;
+
+	/** Horizontal distance used to find a ledge in front of the player. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Climb", meta = (AllowPrivateAccess = "true", ClampMin = "10"))
+	float ClimbReach = 90.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Climb", meta = (AllowPrivateAccess = "true", ClampMin = "10"))
+	float MinimumClimbHeight = 40.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Climb", meta = (AllowPrivateAccess = "true", ClampMin = "20"))
+	float MaximumClimbHeight = 140.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement|Climb", meta = (AllowPrivateAccess = "true", ClampMin = "1"))
+	float ClimbLandingInset = 45.0f;
+
+	float MovementNoiseMultiplier = 1.0f;
+	bool bSprintHeld = false;
 
 
 	/* --- INPUT ASSETS --- */
@@ -76,4 +114,10 @@ private:
 	void Look(const FInputActionValue& Value);
 	void StartJump();
 	void EndJump();
+	void StartSprint();
+	void StopSprint();
+	void StartCrouch();
+	void StopCrouch();
+	void UpdateLocomotionState();
+	bool TryClimb();
 };

@@ -58,7 +58,7 @@ What they mean:
 
 ## Opening the Unreal project
 
-The C++ project now exists. Open `DarknessOfKabul.uproject` with Unreal Engine 5.6.1. The project starts in Epic's editable First Person graybox map at `/Game/FirstPerson/Lvl_FirstPerson` and uses our C++ `ADOKGameMode`, `ADOKPlayerController`, and `ADOKCharacter`.
+Open `DarknessOfKabul.uproject` with Unreal Engine 5.6.1. The project starts in `/Game/Maps/L_TargetPractice` and uses `AKabulGameMode`, `AKabulPlayerController`, and `APlayerCharacter` for milestone-one movement.
 
 If Unreal asks to rebuild modules, choose **Yes**. A successful Development Editor build has already been verified on this machine. Follow `EDITOR_START_HERE.md` before changing the starter map.
 
@@ -80,7 +80,7 @@ Planned built-in features:
 | StateTree | Plugin | No | A small explicit zombie state enum is easier to build and explain |
 | Cable / Chaos rope simulation | Plugin/system | No | The rubber bands only need visual animation; draw time controls launch speed |
 
-Aim, fire, sprint, interact, trajectory toggle, and restart are currently bound directly to keyboard/mouse keys in `ADOKCharacter.cpp`. This makes the first build immediately playable without asking you to create six more binary Input Action assets. We can migrate those actions to Enhanced Input assets after the first map and character Blueprint are stable.
+Movement, look, and jump use the existing Enhanced Input assets. Sprint and crouch are intentionally direct key bindings in `PlayerCharacter.cpp` so the milestone remains small and readable. There is no firing input in the current player class.
 
 Only add a module to `DarknessOfKabul.Build.cs` when C++ actually uses it. Fewer dependencies mean faster builds and fewer confusing errors.
 
