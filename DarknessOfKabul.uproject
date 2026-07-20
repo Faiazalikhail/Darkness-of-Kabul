@@ -11,9 +11,7 @@
       "AdditionalDependencies": [
         "Engine",
         "EnhancedInput",
-        "UMG",
-        "AIModule",
-        "NavigationSystem"
+        "UMG"
       ]
     }
   ],

@@ -16,12 +16,6 @@ public class DarknessOfKabul : ModuleRules
 			"UMG"
 		});
 
-		PrivateDependencyModuleNames.AddRange(new string[]
-		{
-			"Slate",
-			"SlateCore",
-			"AIModule",
-			"NavigationSystem"
-		});
-    }
+		// Add private dependencies only when an implementation needs them.
+	}
 }
