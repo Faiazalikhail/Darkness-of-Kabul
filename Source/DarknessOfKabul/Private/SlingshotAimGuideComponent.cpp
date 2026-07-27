@@ -31,6 +31,7 @@ void USlingshotAimGuideComponent::DrawGuide(
 	const FVector CameraLocation = Camera->GetComponentLocation();
 	const FVector CameraForward = Camera->GetForwardVector();
 	const FVector CameraUp = Camera->GetUpVector();
+	const FVector CameraRight = Camera->GetRightVector();
 
 	FCollisionQueryParams QueryParameters(
 		SCENE_QUERY_STAT(SlingshotAimGuide),
@@ -72,7 +73,8 @@ void USlingshotAimGuideComponent::DrawGuide(
 	const FVector TrajectoryStart =
 		CameraLocation
 		+ CameraForward * TrajectoryStartDistance
-		- CameraUp * TrajectoryVerticalOffset;
+		- CameraUp * TrajectoryVerticalOffset
+		- CameraRight * TrajectoryLeftOffset;
 
 	const FVector AimDirection =
 		(TargetPoint - TrajectoryStart).GetSafeNormal();

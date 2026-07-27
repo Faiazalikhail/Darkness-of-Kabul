@@ -46,7 +46,11 @@ private:
 
 	/** Keeps the curved guide visibly below the red target dot. */
 	UPROPERTY(EditDefaultsOnly, Category = "Aim Guide", meta = (ClampMin = "0"))
-	float TrajectoryVerticalOffset = 14.0f;
+	float TrajectoryVerticalOffset = 24.0f;
+
+	/** Moves the curved guide toward the pulled stone on the left side. */
+	UPROPERTY(EditDefaultsOnly, Category = "Aim Guide", meta = (ClampMin = "0"))
+	float TrajectoryLeftOffset = 45.0f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Aim Guide", meta = (ClampMin = "2"))
 	int32 TrajectoryPointCount = 18;
