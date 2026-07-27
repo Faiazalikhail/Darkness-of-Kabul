@@ -26,7 +26,7 @@ APlayerCharacter::APlayerCharacter()
 	GetCharacterMovement()->JumpZVelocity = 460.0f;
 	GetCharacterMovement()->GravityScale = 1.25f;
 	GetCharacterMovement()->AirControl = 0.18f;
-	GetCharacterMovement()->MaxAcceleration = 1300.0f;
+	GetCharacterMovement()->MaxAcceleration = 1600.0f;
 	GetCharacterMovement()->BrakingDecelerationWalking = 1800.0f;
 	GetCharacterMovement()->GroundFriction = 9.0f;
 	GetCharacterMovement()->FallingLateralFriction = 0.25f;

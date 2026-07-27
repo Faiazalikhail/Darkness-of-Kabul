@@ -5,12 +5,16 @@
 #include "StoneProjectile.generated.h"
 
 class USphereComponent;
+class UStaticMeshComponent;
+class UProjectileMovementComponent;
 
 /**
- * Native base for the slingshot stone.
- * Owns the root collision; visuals, movement, and hit reactions are added next.
+ * A stone launched by the player's slingshot.
+ *
+ * Collision detects impacts.
+ * StoneMesh displays the stone.
+ * ProjectileMovement makes it fly and bounce.
  */
-
 UCLASS(Blueprintable)
 class DARKNESSOFKABUL_API AStoneProjectile : public AActor
 {
@@ -20,6 +24,30 @@ public:
 	AStoneProjectile();
 
 private:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Projectile", meta = (AllowPrivateAccess = "true"))
+	/** The physical collision shape and root component. */
+	UPROPERTY(
+		VisibleAnywhere,
+		BlueprintReadOnly,
+		Category = "Projectile",
+		meta = (AllowPrivateAccess = "true")
+	)
 	TObjectPtr<USphereComponent> Collision;
+
+	/** The visible stone. Collision is handled by Collision above. */
+	UPROPERTY(
+		VisibleAnywhere,
+		BlueprintReadOnly,
+		Category = "Projectile",
+		meta = (AllowPrivateAccess = "true")
+	)
+	TObjectPtr<UStaticMeshComponent> StoneMesh;
+
+	/** Controls the stone's speed, gravity and bouncing. */
+	UPROPERTY(
+		VisibleAnywhere,
+		BlueprintReadOnly,
+		Category = "Projectile",
+		meta = (AllowPrivateAccess = "true")
+	)
+	TObjectPtr<UProjectileMovementComponent> ProjectileMovement;
 };
