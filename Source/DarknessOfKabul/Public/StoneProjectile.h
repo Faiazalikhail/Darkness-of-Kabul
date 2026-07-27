@@ -23,8 +23,17 @@ class DARKNESSOFKABUL_API AStoneProjectile : public AActor
 public:
 	AStoneProjectile();
 
+	/**
+	 * Launches the stone in the supplied direction.
+	 *
+	 * @param Direction Direction in which the stone should travel.
+	 * @param Speed Launch speed measured in centimetres per second.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Projectile")
+	void Launch(const FVector& Direction, float Speed);
+
 private:
-	/** The physical collision shape and root component. */
+	/** Physical collision shape and root component. */
 	UPROPERTY(
 		VisibleAnywhere,
 		BlueprintReadOnly,
@@ -33,7 +42,7 @@ private:
 	)
 	TObjectPtr<USphereComponent> Collision;
 
-	/** The visible stone. Collision is handled by Collision above. */
+	/** Visible stone mesh. Collision is handled by Collision. */
 	UPROPERTY(
 		VisibleAnywhere,
 		BlueprintReadOnly,

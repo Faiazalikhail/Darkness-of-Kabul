@@ -294,16 +294,113 @@ void APlayerCharacter::SetupPlayerInputComponent(
 		&APlayerCharacter::StopCrouch
 	);
 
-	// Fire one stone when the left mouse button is pressed.
 	PlayerInputComponent->BindKey(
 		EKeys::LeftMouseButton,
 		IE_Pressed,
 		this,
-		&APlayerCharacter::FireStone
+		&APlayerCharacter::StartChargingStone
 	);
+
+	PlayerInputComponent->BindKey(
+		EKeys::LeftMouseButton,
+		IE_Released,
+		this,
+		&APlayerCharacter::ReleaseChargedStone
+	);
+
+	PlayerInputComponent->BindKey(
+		EKeys::RightMouseButton,
+		IE_Pressed,
+		this,
+		&APlayerCharacter::StartAiming
+	);
+
+	PlayerInputComponent->BindKey(
+		EKeys::RightMouseButton,
+		IE_Released,
+		this,
+		&APlayerCharacter::StopAiming
+	);
+
+
 }
 
-void APlayerCharacter::FireStone()
+
+void APlayerCharacter::StartAiming()
+{
+	bIsAiming = true;
+}
+
+void APlayerCharacter::StopAiming()
+{
+	bIsAiming = false;
+
+	// Releasing aim also cancels an unfinished pull.
+	bChargingStone = false;
+}
+
+
+void APlayerCharacter::StartChargingStone()
+{
+	UWorld* World = GetWorld();
+
+	if (!World || !bIsAiming || bChargingStone)
+	{
+		return;
+	}
+
+	bChargingStone = true;
+	ChargeStartTime = World->GetTimeSeconds();
+}
+
+void APlayerCharacter::ReleaseChargedStone()
+{
+	UWorld* World = GetWorld();
+
+	if (!World || !bChargingStone)
+	{
+		return;
+	}
+
+	bChargingStone = false;
+
+	const float HeldTime =
+		FMath::Max(
+			0.0f,
+			World->GetTimeSeconds() - ChargeStartTime
+		);
+
+	// Releasing too early cancels the shot.
+	if (HeldTime < MinimumChargeTime)
+	{
+		return;
+	}
+
+	const float ChargeRange =
+		FMath::Max(
+			MaximumChargeTime - MinimumChargeTime,
+			KINDA_SMALL_NUMBER
+		);
+
+	const float ChargeAmount =
+		FMath::Clamp(
+			(HeldTime - MinimumChargeTime) / ChargeRange,
+			0.0f,
+			0.3f
+		);
+
+	const float LaunchSpeed =
+		FMath::Lerp(
+			MinimumLaunchSpeed,
+			MaximumLaunchSpeed,
+			ChargeAmount
+		);
+
+	FireStone(LaunchSpeed);
+}
+
+
+void APlayerCharacter::FireStone(const float LaunchSpeed)
 {
 	UWorld* World = GetWorld();
 
@@ -333,12 +430,18 @@ void APlayerCharacter::FireStone()
 		ESpawnActorCollisionHandlingMethod::
 		AdjustIfPossibleButAlwaysSpawn;
 
-	World->SpawnActor<AStoneProjectile>(
-		StoneProjectileClass,
-		SpawnLocation,
-		SpawnRotation,
-		SpawnParameters
-	);
+	AStoneProjectile* FiredStone =
+		World->SpawnActor<AStoneProjectile>(
+			StoneProjectileClass,
+			SpawnLocation,
+			SpawnRotation,
+			SpawnParameters
+		);
+
+	if (FiredStone)
+	{
+		FiredStone->Launch(CameraForward, LaunchSpeed);
+	}
 }
 
 void APlayerCharacter::Move(const FInputActionValue& Value)

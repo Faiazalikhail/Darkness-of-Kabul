@@ -55,7 +55,27 @@ private:
 
 	/* --- SLINGSHOT --- */
 
-	/** Blueprint projectile created when the player fires. */
+
+
+	/** Aiming **/
+
+	/** True while the player is holding the right mouse button. */
+	UPROPERTY(
+		VisibleInstanceOnly,
+		BlueprintReadOnly,
+		Category = "Weapon|Slingshot",
+		meta = (AllowPrivateAccess = "true")
+	)
+	bool bIsAiming = false;
+
+	void StartAiming();
+	void StopAiming();
+
+
+
+
+	/** Shooting **/
+/** Projectile Blueprint created when the player fires. */
 	UPROPERTY(
 		EditDefaultsOnly,
 		BlueprintReadOnly,
@@ -64,7 +84,49 @@ private:
 	)
 	TSubclassOf<AStoneProjectile> StoneProjectileClass;
 
-	/** Creates and launches one stone from the camera. */
+	/** Minimum speed produced by a quick click. */
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Weapon|Slingshot",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0")
+	)
+	float MinimumLaunchSpeed = 6000.0f;
+
+	/** Maximum speed produced by a fully charged shot. */
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Weapon|Slingshot",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0")
+	)
+	float MaximumLaunchSpeed = 9200.0f;
+
+	/** Minimum pull time required before a stone can be fired. */
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Weapon|Slingshot",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0")
+	)
+	float MinimumChargeTime = 0.3f;
+
+	/** Time required to reach maximum launch speed. */
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Weapon|Slingshot",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.01")
+	)
+	float MaximumChargeTime = 2.5f;
+
+
+	float ChargeStartTime = 0.0f;
+	bool bChargingStone = false;
+
+	void StartChargingStone();
+	void ReleaseChargedStone();
+	void FireStone(float LaunchSpeed);
 	
 
 
@@ -152,5 +214,4 @@ private:
 	void StopCrouch();
 	void UpdateLocomotionState();
 	bool TryClimb();
-	void FireStone();
 };
