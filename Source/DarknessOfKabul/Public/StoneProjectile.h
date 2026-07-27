@@ -4,12 +4,22 @@
 #include "GameFramework/Actor.h"
 #include "StoneProjectile.generated.h"
 
+class USphereComponent;
+
 /**
- * Blueprint base for the slingshot stone.
- * Components, motion, collision sweeps, and hit reactions are deferred.
+ * Native base for the slingshot stone.
+ * Owns the root collision; visuals, movement, and hit reactions are added next.
  */
+
 UCLASS(Blueprintable)
 class DARKNESSOFKABUL_API AStoneProjectile : public AActor
 {
 	GENERATED_BODY()
+
+public:
+	AStoneProjectile();
+
+private:
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Projectile", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<USphereComponent> Collision;
 };

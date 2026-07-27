@@ -1,0 +1,15 @@
+<Project>
+  <!--
+    UE 5.6 generated a 48,589-character IncludePath for this NMake project.
+    MSBuild's SetEnv task cannot create an environment variable longer than
+    Windows' 32,767-character limit, so Visual Studio failed before invoking
+    UnrealBuildTool.
+
+    UnrealBuildTool supplies the real compiler include paths itself. Keep the
+    generated path for Visual Studio design-time browsing, but use a short path
+    for actual builds so SetEnv can launch UBT.
+  -->
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'DarknessOfKabul' and '$(DesignTimeBuild)' != 'true'">
+    <IncludePath>$(DefaultSystemIncludePaths)</IncludePath>
+  </PropertyGroup>
+</Project>
