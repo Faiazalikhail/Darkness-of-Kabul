@@ -11,6 +11,7 @@
 #include "InputAction.h"
 #include "InputCoreTypes.h"
 #include "InputMappingContext.h"
+#include "SlingshotAimGuideComponent.h"
 #include "StoneProjectile.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -56,6 +57,13 @@ APlayerCharacter::APlayerCharacter()
 	Mesh1P->CastShadow = false;
 	Mesh1P->SetRelativeLocation(FVector(-30.0f, 0.0f, -150.0f));
 
+	// The guide is calculation and drawing only. It does not attach to the
+	// camera, so it cannot alter the working camera hierarchy.
+	SlingshotAimGuide =
+		CreateDefaultSubobject<USlingshotAimGuideComponent>(
+			TEXT("SlingshotAimGuide")
+		);
+
 	// Find the project's input assets.
 	static ConstructorHelpers::FObjectFinder<UInputMappingContext>
 		DefaultContext(TEXT("/Game/Input/IMC_Default.IMC_Default"));
@@ -99,6 +107,8 @@ void APlayerCharacter::BeginPlay()
 void APlayerCharacter::Tick(const float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+
+	UpdateSlingshotAim();
 
 	if (LandingShakeStrength <= 0.0f)
 	{
@@ -441,6 +451,73 @@ void APlayerCharacter::FireStone(const float LaunchSpeed)
 	if (FiredStone)
 	{
 		FiredStone->Launch(CameraForward, LaunchSpeed);
+	}
+}
+
+float APlayerCharacter::GetSlingshotPullAmount() const
+{
+	if (!bIsAiming || !bChargingStone)
+	{
+		return 0.0f;
+	}
+
+	const float ChargeRange =
+		FMath::Max(
+			MaximumChargeTime - MinimumChargeTime,
+			KINDA_SMALL_NUMBER
+		);
+
+	return FMath::Clamp(
+		(GetSlingshotHeldTime() - MinimumChargeTime) / ChargeRange,
+		0.0f,
+		1.0f
+	);
+}
+
+float APlayerCharacter::GetSlingshotHeldTime() const
+{
+	const UWorld* World = GetWorld();
+
+	if (!World || !bChargingStone)
+	{
+		return 0.0f;
+	}
+
+	return FMath::Max(
+		0.0f,
+		World->GetTimeSeconds() - ChargeStartTime
+	);
+}
+
+void APlayerCharacter::UpdateSlingshotAim()
+{
+	const float HeldTime = GetSlingshotHeldTime();
+
+	// Pulling past the safe limit cancels the shot and forces the player
+	// to release and press the aim button again.
+	if (bIsAiming
+		&& bChargingStone
+		&& HeldTime >= MaximumChargeTime + OverdrawGraceTime)
+	{
+		bChargingStone = false;
+		bIsAiming = false;
+
+		LandingShakeElapsed = 0.0f;
+		LandingShakeStrength = 0.65f;
+	}
+
+	if (SlingshotAimGuide)
+	{
+		SlingshotAimGuide->DrawGuide(
+			FirstPersonCameraComponent,
+			bIsAiming,
+			bChargingStone,
+			HeldTime,
+			MinimumChargeTime,
+			MaximumChargeTime,
+			MinimumLaunchSpeed,
+			MaximumLaunchSpeed
+		);
 	}
 }
 

@@ -8,6 +8,7 @@ class UInputMappingContext;
 class UInputAction;
 class UCameraComponent;
 class USkeletalMeshComponent;
+class USlingshotAimGuideComponent;
 class AStoneProjectile;
 struct FInputActionValue;
 
@@ -27,6 +28,14 @@ public:
 
 	// Returns the first-person camera component
 	UCameraComponent* GetFirstPersonCameraComponent() const { return FirstPersonCameraComponent; }
+
+	/** True while the player is holding the slingshot in its aiming position. */
+	UFUNCTION(BlueprintPure, Category = "Weapon|Slingshot")
+	bool IsSlingshotAiming() const { return bIsAiming; }
+
+	/** Current pull amount from 0 (not pulled) to 1 (fully pulled). */
+	UFUNCTION(BlueprintPure, Category = "Weapon|Slingshot")
+	float GetSlingshotPullAmount() const;
 
 	/** Multiplier reserved for future footsteps or AI hearing. Crouching is quietest. */
 	UFUNCTION(BlueprintPure, Category = "Movement|Noise")
@@ -51,6 +60,10 @@ private:
 	/** First person mesh (arms), seen only by self */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mesh", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USkeletalMeshComponent> Mesh1P;
+
+	/** Draws the target dot and curved stone-flight preview. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon|Slingshot", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<USlingshotAimGuideComponent> SlingshotAimGuide;
 
 
 	/* --- SLINGSHOT --- */
@@ -120,6 +133,14 @@ private:
 	)
 	float MaximumChargeTime = 2.5f;
 
+	/** Extra time allowed at full strength before the pull fails. */
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Weapon|Slingshot",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0")
+	)
+	float OverdrawGraceTime = 0.6f;
 
 	float ChargeStartTime = 0.0f;
 	bool bChargingStone = false;
@@ -127,7 +148,8 @@ private:
 	void StartChargingStone();
 	void ReleaseChargedStone();
 	void FireStone(float LaunchSpeed);
-	
+	float GetSlingshotHeldTime() const;
+	void UpdateSlingshotAim();
 
 
 	/* --- LOCOMOTION TUNING --- */

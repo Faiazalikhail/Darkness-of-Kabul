@@ -34,15 +34,15 @@ AStoneProjectile::AStoneProjectile()
 		);
 
 	ProjectileMovement->SetUpdatedComponent(Collision);
-	ProjectileMovement->InitialSpeed = 2000.0f;
-	ProjectileMovement->MaxSpeed = 12000.0f;
+	ProjectileMovement->InitialSpeed = 3500.0f;
+	ProjectileMovement->MaxSpeed = 8500.0f;
 	ProjectileMovement->ProjectileGravityScale = 1.0f;
 	ProjectileMovement->bRotationFollowsVelocity = true;
 
 	// Allow the stone to bounce after an impact.
 	ProjectileMovement->bShouldBounce = true;
 	ProjectileMovement->Bounciness = 0.25f;
-	ProjectileMovement->Friction = 0.6f;
+	ProjectileMovement->Friction = 0.4f;
 	ProjectileMovement->bForceSubStepping = true;
 }
 
