@@ -8,6 +8,7 @@ class UInputMappingContext;
 class UInputAction;
 class UCameraComponent;
 class USkeletalMeshComponent;
+class AStoneProjectile;
 struct FInputActionValue;
 
 /**
@@ -50,6 +51,21 @@ private:
 	/** First person mesh (arms), seen only by self */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mesh", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USkeletalMeshComponent> Mesh1P;
+
+
+	/* --- SLINGSHOT --- */
+
+	/** Blueprint projectile created when the player fires. */
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Weapon|Slingshot",
+		meta = (AllowPrivateAccess = "true")
+	)
+	TSubclassOf<AStoneProjectile> StoneProjectileClass;
+
+	/** Creates and launches one stone from the camera. */
+	
 
 
 	/* --- LOCOMOTION TUNING --- */
@@ -136,4 +152,5 @@ private:
 	void StopCrouch();
 	void UpdateLocomotionState();
 	bool TryClimb();
+	void FireStone();
 };

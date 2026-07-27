@@ -1,24 +1,28 @@
 #include "PlayerCharacter.h"
+
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
+#include "Engine/World.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "InputAction.h"
 #include "InputCoreTypes.h"
 #include "InputMappingContext.h"
+#include "StoneProjectile.h"
 #include "UObject/ConstructorHelpers.h"
 
 APlayerCharacter::APlayerCharacter()
 {
 	PrimaryActorTick.bCanEverTick = true;
 
-	// Configure rotation settings
+	// Character movement and rotation.
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationYaw = true;
 	bUseControllerRotationRoll = false;
+
 	GetCharacterMovement()->bOrientRotationToMovement = false;
 	GetCharacterMovement()->GetNavAgentPropertiesRef().bCanCrouch = true;
 	GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
@@ -31,34 +35,45 @@ APlayerCharacter::APlayerCharacter()
 	GetCharacterMovement()->GroundFriction = 9.0f;
 	GetCharacterMovement()->FallingLateralFriction = 0.25f;
 
-	// Create and setup the First Person Camera
-	FirstPersonCameraComponent = CreateDefaultSubobject<UCameraComponent>(TEXT("FirstPersonCamera"));
+	// First-person camera.
+	FirstPersonCameraComponent =
+		CreateDefaultSubobject<UCameraComponent>(TEXT("FirstPersonCamera"));
+
 	FirstPersonCameraComponent->SetupAttachment(GetCapsuleComponent());
-	FirstPersonCameraComponent->SetRelativeLocation(FVector(-10.f, 0.f, 60.f)); // Position the camera
+	FirstPersonCameraComponent->SetRelativeLocation(
+		FVector(-10.0f, 0.0f, 60.0f)
+	);
 	FirstPersonCameraComponent->bUsePawnControlRotation = true;
 
-	// Create and setup the First Person Mesh (arms)
-	Mesh1P = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("CharacterMesh1P"));
-	Mesh1P->SetOnlyOwnerSee(true);
+	// First-person character mesh.
+	Mesh1P = CreateDefaultSubobject<USkeletalMeshComponent>(
+		TEXT("CharacterMesh1P")
+	);
+
 	Mesh1P->SetupAttachment(FirstPersonCameraComponent);
+	Mesh1P->SetOnlyOwnerSee(true);
 	Mesh1P->bCastDynamicShadow = false;
 	Mesh1P->CastShadow = false;
-	Mesh1P->SetRelativeLocation(FVector(-30.f, 0.f, -150.f));
+	Mesh1P->SetRelativeLocation(FVector(-30.0f, 0.0f, -150.0f));
 
-	// Safe native defaults keep the C++ pawn playable even before a Blueprint
-	// child assigns its own input assets.
-	static ConstructorHelpers::FObjectFinder<UInputMappingContext> DefaultContext(
-		TEXT("/Game/Input/IMC_Default.IMC_Default"));
-	static ConstructorHelpers::FObjectFinder<UInputMappingContext> MouseContext(
-		TEXT("/Game/Input/IMC_MouseLook.IMC_MouseLook"));
-	static ConstructorHelpers::FObjectFinder<UInputAction> MoveInput(
-		TEXT("/Game/Input/Actions/IA_Move.IA_Move"));
-	static ConstructorHelpers::FObjectFinder<UInputAction> LookInput(
-		TEXT("/Game/Input/Actions/IA_Look.IA_Look"));
-	static ConstructorHelpers::FObjectFinder<UInputAction> MouseLookInput(
-		TEXT("/Game/Input/Actions/IA_MouseLook.IA_MouseLook"));
-	static ConstructorHelpers::FObjectFinder<UInputAction> JumpInput(
-		TEXT("/Game/Input/Actions/IA_Jump.IA_Jump"));
+	// Find the project's input assets.
+	static ConstructorHelpers::FObjectFinder<UInputMappingContext>
+		DefaultContext(TEXT("/Game/Input/IMC_Default.IMC_Default"));
+
+	static ConstructorHelpers::FObjectFinder<UInputMappingContext>
+		MouseContext(TEXT("/Game/Input/IMC_MouseLook.IMC_MouseLook"));
+
+	static ConstructorHelpers::FObjectFinder<UInputAction>
+		MoveInput(TEXT("/Game/Input/Actions/IA_Move.IA_Move"));
+
+	static ConstructorHelpers::FObjectFinder<UInputAction>
+		LookInput(TEXT("/Game/Input/Actions/IA_Look.IA_Look"));
+
+	static ConstructorHelpers::FObjectFinder<UInputAction>
+		MouseLookInput(TEXT("/Game/Input/Actions/IA_MouseLook.IA_MouseLook"));
+
+	static ConstructorHelpers::FObjectFinder<UInputAction>
+		JumpInput(TEXT("/Game/Input/Actions/IA_Jump.IA_Jump"));
 
 	DefaultMappingContext = DefaultContext.Object;
 	MouseLookMappingContext = MouseContext.Object;
@@ -71,8 +86,13 @@ APlayerCharacter::APlayerCharacter()
 void APlayerCharacter::BeginPlay()
 {
 	Super::BeginPlay();
-	CameraRestingLocation = FirstPersonCameraComponent->GetRelativeLocation();
-	CameraRestingRotation = FirstPersonCameraComponent->GetRelativeRotation();
+
+	CameraRestingLocation =
+		FirstPersonCameraComponent->GetRelativeLocation();
+
+	CameraRestingRotation =
+		FirstPersonCameraComponent->GetRelativeRotation();
+
 	UpdateLocomotionState();
 }
 
@@ -86,131 +106,293 @@ void APlayerCharacter::Tick(const float DeltaSeconds)
 	}
 
 	LandingShakeElapsed += DeltaSeconds;
-	const float NormalizedTime = LandingShakeElapsed / LandingShakeDuration;
+
+	const float NormalizedTime =
+		LandingShakeElapsed / LandingShakeDuration;
+
 	if (NormalizedTime >= 1.0f)
 	{
 		LandingShakeStrength = 0.0f;
-		FirstPersonCameraComponent->SetRelativeLocation(CameraRestingLocation);
-		FirstPersonCameraComponent->SetRelativeRotation(CameraRestingRotation);
+
+		FirstPersonCameraComponent->SetRelativeLocation(
+			CameraRestingLocation
+		);
+
+		FirstPersonCameraComponent->SetRelativeRotation(
+			CameraRestingRotation
+		);
+
 		return;
 	}
 
-	// A fast damped dip gives impact weight without disturbing player aim.
 	const float Envelope = FMath::Square(1.0f - NormalizedTime);
-	const float Wave = FMath::Sin(NormalizedTime * 3.0f * UE_PI);
-	const float CameraDrop = -MaximumLandingCameraDrop * LandingShakeStrength * Envelope * FMath::Abs(Wave);
-	const float CameraRoll = 0.7f * LandingShakeStrength * Envelope * Wave;
-	FirstPersonCameraComponent->SetRelativeLocation(CameraRestingLocation + FVector(0.0f, 0.0f, CameraDrop));
-	FirstPersonCameraComponent->SetRelativeRotation(CameraRestingRotation + FRotator(0.0f, 0.0f, CameraRoll));
+	const float Wave =
+		FMath::Sin(NormalizedTime * 3.0f * UE_PI);
+
+	const float CameraDrop =
+		-MaximumLandingCameraDrop
+		* LandingShakeStrength
+		* Envelope
+		* FMath::Abs(Wave);
+
+	const float CameraRoll =
+		0.7f
+		* LandingShakeStrength
+		* Envelope
+		* Wave;
+
+	FirstPersonCameraComponent->SetRelativeLocation(
+		CameraRestingLocation
+		+ FVector(0.0f, 0.0f, CameraDrop)
+	);
+
+	FirstPersonCameraComponent->SetRelativeRotation(
+		CameraRestingRotation
+		+ FRotator(0.0f, 0.0f, CameraRoll)
+	);
 }
 
 void APlayerCharacter::PawnClientRestart()
 {
 	Super::PawnClientRestart();
 
-	// Register Input Mapping Contexts here to ensure the controller is fully ready
-	if (APlayerController* PlayerController = Cast<APlayerController>(GetController()))
+	APlayerController* PlayerController =
+		Cast<APlayerController>(GetController());
+
+	if (!PlayerController)
 	{
-		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PlayerController->GetLocalPlayer()))
-		{
-			Subsystem->ClearAllMappings();
+		return;
+	}
 
-			if (DefaultMappingContext)
-			{
-				Subsystem->AddMappingContext(DefaultMappingContext, 0);
-			}
+	UEnhancedInputLocalPlayerSubsystem* Subsystem =
+		ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(
+			PlayerController->GetLocalPlayer()
+		);
 
-			if (MouseLookMappingContext)
-			{
-				Subsystem->AddMappingContext(MouseLookMappingContext, 1);
-			}
-		}
+	if (!Subsystem)
+	{
+		return;
+	}
+
+	Subsystem->ClearAllMappings();
+
+	if (DefaultMappingContext)
+	{
+		Subsystem->AddMappingContext(DefaultMappingContext, 0);
+	}
+
+	if (MouseLookMappingContext)
+	{
+		Subsystem->AddMappingContext(MouseLookMappingContext, 1);
 	}
 }
 
 void APlayerCharacter::Landed(const FHitResult& Hit)
 {
-	const float ImpactSpeed = FMath::Max(0.0f, -GetVelocity().Z);
+	const float ImpactSpeed =
+		FMath::Max(0.0f, -GetVelocity().Z);
+
 	Super::Landed(Hit);
 
-	if (ImpactSpeed >= LandingShakeMinimumSpeed)
+	if (ImpactSpeed < LandingShakeMinimumSpeed)
 	{
-		LandingShakeElapsed = 0.0f;
-		LandingShakeStrength = FMath::GetMappedRangeValueClamped(
+		return;
+	}
+
+	LandingShakeElapsed = 0.0f;
+
+	LandingShakeStrength =
+		FMath::GetMappedRangeValueClamped(
 			FVector2D(LandingShakeMinimumSpeed, 1100.0f),
 			FVector2D(0.25f, 1.0f),
-			ImpactSpeed);
-	}
+			ImpactSpeed
+		);
 }
 
-void APlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
+void APlayerCharacter::SetupPlayerInputComponent(
+	UInputComponent* PlayerInputComponent
+)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 
-	if (UEnhancedInputComponent* EnhancedInput = Cast<UEnhancedInputComponent>(PlayerInputComponent))
+	if (UEnhancedInputComponent* EnhancedInput =
+		Cast<UEnhancedInputComponent>(PlayerInputComponent))
 	{
 		if (MoveAction)
 		{
-			EnhancedInput->BindAction(MoveAction, ETriggerEvent::Triggered, this, &APlayerCharacter::Move);
+			EnhancedInput->BindAction(
+				MoveAction,
+				ETriggerEvent::Triggered,
+				this,
+				&APlayerCharacter::Move
+			);
 		}
 
 		if (LookAction)
 		{
-			EnhancedInput->BindAction(LookAction, ETriggerEvent::Triggered, this, &APlayerCharacter::Look);
+			EnhancedInput->BindAction(
+				LookAction,
+				ETriggerEvent::Triggered,
+				this,
+				&APlayerCharacter::Look
+			);
 		}
 
 		if (MouseLookAction)
 		{
-			EnhancedInput->BindAction(MouseLookAction, ETriggerEvent::Triggered, this, &APlayerCharacter::Look);
+			EnhancedInput->BindAction(
+				MouseLookAction,
+				ETriggerEvent::Triggered,
+				this,
+				&APlayerCharacter::Look
+			);
 		}
 
 		if (JumpAction)
 		{
-			EnhancedInput->BindAction(JumpAction, ETriggerEvent::Started, this, &APlayerCharacter::StartJump);
-			EnhancedInput->BindAction(JumpAction, ETriggerEvent::Completed, this, &APlayerCharacter::EndJump);
+			EnhancedInput->BindAction(
+				JumpAction,
+				ETriggerEvent::Started,
+				this,
+				&APlayerCharacter::StartJump
+			);
+
+			EnhancedInput->BindAction(
+				JumpAction,
+				ETriggerEvent::Completed,
+				this,
+				&APlayerCharacter::EndJump
+			);
 		}
 	}
 
-	// These actions stay direct and readable. They can become Input
-	// Action assets later
-	PlayerInputComponent->BindKey(EKeys::LeftShift, IE_Pressed, this, &APlayerCharacter::StartSprint);
-	PlayerInputComponent->BindKey(EKeys::LeftShift, IE_Released, this, &APlayerCharacter::StopSprint);
-	PlayerInputComponent->BindKey(EKeys::LeftControl, IE_Pressed, this, &APlayerCharacter::StartCrouch);
-	PlayerInputComponent->BindKey(EKeys::LeftControl, IE_Released, this, &APlayerCharacter::StopCrouch);
+	PlayerInputComponent->BindKey(
+		EKeys::LeftShift,
+		IE_Pressed,
+		this,
+		&APlayerCharacter::StartSprint
+	);
+
+	PlayerInputComponent->BindKey(
+		EKeys::LeftShift,
+		IE_Released,
+		this,
+		&APlayerCharacter::StopSprint
+	);
+
+	PlayerInputComponent->BindKey(
+		EKeys::LeftControl,
+		IE_Pressed,
+		this,
+		&APlayerCharacter::StartCrouch
+	);
+
+	PlayerInputComponent->BindKey(
+		EKeys::LeftControl,
+		IE_Released,
+		this,
+		&APlayerCharacter::StopCrouch
+	);
+
+	// Fire one stone when the left mouse button is pressed.
+	PlayerInputComponent->BindKey(
+		EKeys::LeftMouseButton,
+		IE_Pressed,
+		this,
+		&APlayerCharacter::FireStone
+	);
+}
+
+void APlayerCharacter::FireStone()
+{
+	UWorld* World = GetWorld();
+
+	if (!World
+		|| !FirstPersonCameraComponent
+		|| !StoneProjectileClass)
+	{
+		return;
+	}
+
+	const FVector CameraLocation =
+		FirstPersonCameraComponent->GetComponentLocation();
+
+	const FVector CameraForward =
+		FirstPersonCameraComponent->GetForwardVector();
+
+	const FVector SpawnLocation =
+		CameraLocation + CameraForward * 100.0f;
+
+	const FRotator SpawnRotation =
+		FirstPersonCameraComponent->GetComponentRotation();
+
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.Owner = this;
+	SpawnParameters.Instigator = this;
+	SpawnParameters.SpawnCollisionHandlingOverride =
+		ESpawnActorCollisionHandlingMethod::
+		AdjustIfPossibleButAlwaysSpawn;
+
+	World->SpawnActor<AStoneProjectile>(
+		StoneProjectileClass,
+		SpawnLocation,
+		SpawnRotation,
+		SpawnParameters
+	);
 }
 
 void APlayerCharacter::Move(const FInputActionValue& Value)
 {
-	if (Controller != nullptr)
+	if (!Controller)
 	{
-		const FVector2D MovementValue = Value.Get<FVector2D>();
-
-		const FRotator ControlRotation = GetControlRotation();
-		const FRotator YawRotation(0.0, ControlRotation.Yaw, 0.0);
-
-		const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
-		const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
-
-		AddMovementInput(ForwardDirection, MovementValue.Y);
-		AddMovementInput(RightDirection, MovementValue.X);
+		return;
 	}
+
+	const FVector2D MovementValue =
+		Value.Get<FVector2D>();
+
+	const FRotator ControlRotation =
+		GetControlRotation();
+
+	const FRotator YawRotation(
+		0.0f,
+		ControlRotation.Yaw,
+		0.0f
+	);
+
+	const FVector ForwardDirection =
+		FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
+
+	const FVector RightDirection =
+		FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
+
+	AddMovementInput(
+		ForwardDirection,
+		MovementValue.Y
+	);
+
+	AddMovementInput(
+		RightDirection,
+		MovementValue.X
+	);
 }
 
 void APlayerCharacter::Look(const FInputActionValue& Value)
 {
-	if (Controller != nullptr)
+	if (!Controller)
 	{
-		const FVector2D LookValue = Value.Get<FVector2D>();
-
-		AddControllerYawInput(LookValue.X);
-		AddControllerPitchInput(LookValue.Y);
+		return;
 	}
+
+	const FVector2D LookValue =
+		Value.Get<FVector2D>();
+
+	AddControllerYawInput(LookValue.X);
+	AddControllerPitchInput(LookValue.Y);
 }
 
 void APlayerCharacter::StartJump()
 {
-	// Space first tries a short ledge climb. If no valid ledge exists, normal
-	// CharacterMovement jumping handles the vertical launch and gravity.
 	if (!TryClimb())
 	{
 		Jump();
@@ -237,6 +419,7 @@ void APlayerCharacter::StopSprint()
 void APlayerCharacter::StartCrouch()
 {
 	bSprintHeld = false;
+
 	if (GetCharacterMovement()->IsMovingOnGround())
 	{
 		Crouch();
@@ -248,21 +431,37 @@ void APlayerCharacter::StopCrouch()
 	UnCrouch();
 }
 
-void APlayerCharacter::OnStartCrouch(const float HalfHeightAdjust, const float ScaledHalfHeightAdjust)
+void APlayerCharacter::OnStartCrouch(
+	const float HalfHeightAdjust,
+	const float ScaledHalfHeightAdjust
+)
 {
-	Super::OnStartCrouch(HalfHeightAdjust, ScaledHalfHeightAdjust);
+	Super::OnStartCrouch(
+		HalfHeightAdjust,
+		ScaledHalfHeightAdjust
+	);
+
 	UpdateLocomotionState();
 }
 
-void APlayerCharacter::OnEndCrouch(const float HalfHeightAdjust, const float ScaledHalfHeightAdjust)
+void APlayerCharacter::OnEndCrouch(
+	const float HalfHeightAdjust,
+	const float ScaledHalfHeightAdjust
+)
 {
-	Super::OnEndCrouch(HalfHeightAdjust, ScaledHalfHeightAdjust);
+	Super::OnEndCrouch(
+		HalfHeightAdjust,
+		ScaledHalfHeightAdjust
+	);
+
 	UpdateLocomotionState();
 }
 
 void APlayerCharacter::UpdateLocomotionState()
 {
-	UCharacterMovementComponent* Movement = GetCharacterMovement();
+	UCharacterMovementComponent* Movement =
+		GetCharacterMovement();
+
 	Movement->MaxWalkSpeedCrouched = CrouchWalkSpeed;
 
 	if (bIsCrouched)
@@ -286,68 +485,132 @@ bool APlayerCharacter::TryClimb()
 {
 	UWorld* World = GetWorld();
 	UCapsuleComponent* Capsule = GetCapsuleComponent();
-	if (!World || !Capsule || bIsCrouched || !GetCharacterMovement()->IsMovingOnGround())
+
+	if (!World
+		|| !Capsule
+		|| bIsCrouched
+		|| !GetCharacterMovement()->IsMovingOnGround())
 	{
 		return false;
 	}
 
-	const FRotator YawRotation(0.0f, GetControlRotation().Yaw, 0.0f);
-	const FVector Forward = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
-	const FVector ActorLocation = GetActorLocation();
-	const float CapsuleHalfHeight = Capsule->GetScaledCapsuleHalfHeight();
-	const float CapsuleRadius = Capsule->GetScaledCapsuleRadius();
-	const float FeetHeight = ActorLocation.Z - CapsuleHalfHeight;
+	const FRotator YawRotation(
+		0.0f,
+		GetControlRotation().Yaw,
+		0.0f
+	);
 
-	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(PlayerClimb), false, this);
-	QueryParams.AddIgnoredActor(this);
+	const FVector Forward =
+		FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
 
-	// First trace: find a wall close to the player's chest.
-	const FVector WallTraceStart = ActorLocation + FVector::UpVector * 35.0f;
-	const FVector WallTraceEnd = WallTraceStart + Forward * ClimbReach;
+	const FVector ActorLocation =
+		GetActorLocation();
+
+	const float CapsuleHalfHeight =
+		Capsule->GetScaledCapsuleHalfHeight();
+
+	const float CapsuleRadius =
+		Capsule->GetScaledCapsuleRadius();
+
+	const float FeetHeight =
+		ActorLocation.Z - CapsuleHalfHeight;
+
+	FCollisionQueryParams QueryParameters(
+		SCENE_QUERY_STAT(PlayerClimb),
+		false,
+		this
+	);
+
+	QueryParameters.AddIgnoredActor(this);
+
+	const FVector WallTraceStart =
+		ActorLocation + FVector::UpVector * 35.0f;
+
+	const FVector WallTraceEnd =
+		WallTraceStart + Forward * ClimbReach;
+
 	FHitResult WallHit;
-	if (!World->LineTraceSingleByChannel(WallHit, WallTraceStart, WallTraceEnd, ECC_Visibility, QueryParams))
+
+	if (!World->LineTraceSingleByChannel(
+		WallHit,
+		WallTraceStart,
+		WallTraceEnd,
+		ECC_Visibility,
+		QueryParameters))
 	{
 		return false;
 	}
 
-	// Second trace: start above the wall and search downward for a walkable top.
-	const FVector IntoLedge = (-WallHit.ImpactNormal).GetSafeNormal2D();
-	const FVector TopTraceStart = WallHit.ImpactPoint
+	const FVector IntoLedge =
+		(-WallHit.ImpactNormal).GetSafeNormal2D();
+
+	const FVector TopTraceStart =
+		WallHit.ImpactPoint
 		+ IntoLedge * ClimbLandingInset
-		+ FVector::UpVector * (MaximumClimbHeight + CapsuleHalfHeight);
-	const FVector TopTraceEnd = FVector(TopTraceStart.X, TopTraceStart.Y, FeetHeight + MinimumClimbHeight);
+		+ FVector::UpVector
+		* (MaximumClimbHeight + CapsuleHalfHeight);
+
+	const FVector TopTraceEnd(
+		TopTraceStart.X,
+		TopTraceStart.Y,
+		FeetHeight + MinimumClimbHeight
+	);
+
 	FHitResult TopHit;
-	if (!World->LineTraceSingleByChannel(TopHit, TopTraceStart, TopTraceEnd, ECC_Visibility, QueryParams))
+
+	if (!World->LineTraceSingleByChannel(
+		TopHit,
+		TopTraceStart,
+		TopTraceEnd,
+		ECC_Visibility,
+		QueryParameters))
 	{
 		return false;
 	}
 
-	const float LedgeHeight = TopHit.ImpactPoint.Z - FeetHeight;
+	const float LedgeHeight =
+		TopHit.ImpactPoint.Z - FeetHeight;
+
 	if (LedgeHeight < MinimumClimbHeight
 		|| LedgeHeight > MaximumClimbHeight
-		|| TopHit.ImpactNormal.Z < GetCharacterMovement()->GetWalkableFloorZ())
+		|| TopHit.ImpactNormal.Z
+		< GetCharacterMovement()->GetWalkableFloorZ())
 	{
 		return false;
 	}
 
-	const FVector TargetLocation = TopHit.ImpactPoint
+	const FVector TargetLocation =
+		TopHit.ImpactPoint
 		+ IntoLedge * CapsuleRadius
-		+ FVector::UpVector * (CapsuleHalfHeight + 2.0f);
-	const FCollisionShape CapsuleShape = FCollisionShape::MakeCapsule(CapsuleRadius, CapsuleHalfHeight);
+		+ FVector::UpVector
+		* (CapsuleHalfHeight + 2.0f);
+
+	const FCollisionShape CapsuleShape =
+		FCollisionShape::MakeCapsule(
+			CapsuleRadius,
+			CapsuleHalfHeight
+		);
+
 	if (World->OverlapBlockingTestByChannel(
 		TargetLocation,
 		FQuat::Identity,
 		ECC_Pawn,
 		CapsuleShape,
-		QueryParams))
+		QueryParameters))
 	{
 		return false;
 	}
 
-	// A future animation can interpolate to this target. This prototype uses a
-	// swept move so the capsule never teleports through blocking geometry.
 	GetCharacterMovement()->StopMovementImmediately();
+
 	FHitResult MoveHit;
-	SetActorLocation(TargetLocation, true, &MoveHit, ETeleportType::None);
+
+	SetActorLocation(
+		TargetLocation,
+		true,
+		&MoveHit,
+		ETeleportType::None
+	);
+
 	return !MoveHit.bBlockingHit;
 }
