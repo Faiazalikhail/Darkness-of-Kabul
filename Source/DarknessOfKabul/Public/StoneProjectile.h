@@ -33,6 +33,13 @@ public:
 	void Launch(const FVector& Direction, float Speed);
 
 private:
+	/** Routes the first damaging zombie impact to the struck bone. */
+	UFUNCTION()
+	void HandleProjectileBounce(
+		const FHitResult& ImpactResult,
+		const FVector& ImpactVelocity
+	);
+
 	/** Physical collision shape and root component. */
 	UPROPERTY(
 		VisibleAnywhere,
@@ -59,4 +66,16 @@ private:
 		meta = (AllowPrivateAccess = "true")
 	)
 	TObjectPtr<UProjectileMovementComponent> ProjectileMovement;
+
+	/** Prevents a slow, nearly stopped stone from damaging a zombie. */
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Projectile|Damage",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0")
+	)
+	float MinimumDamageSpeed = 800.0f;
+
+	/** A single stone can damage only one zombie once. */
+	bool bHasDamagedZombie = false;
 };

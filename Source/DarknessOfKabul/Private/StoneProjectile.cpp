@@ -3,6 +3,7 @@
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
+#include "ZombieCharacter.h"
 
 AStoneProjectile::AStoneProjectile()
 {
@@ -16,7 +17,7 @@ AStoneProjectile::AStoneProjectile()
 	SetRootComponent(Collision);
 
 	Collision->InitSphereRadius(5.0f);
-	Collision->SetCollisionProfileName(TEXT("BlockAllDynamic"));
+	Collision->SetCollisionProfileName(TEXT("StoneProjectile"));
 	Collision->SetSimulatePhysics(false);
 
 	// StoneMesh is visual only.
@@ -44,6 +45,11 @@ AStoneProjectile::AStoneProjectile()
 	ProjectileMovement->Bounciness = 0.25f;
 	ProjectileMovement->Friction = 0.4f;
 	ProjectileMovement->bForceSubStepping = true;
+
+	ProjectileMovement->OnProjectileBounce.AddDynamic(
+		this,
+		&AStoneProjectile::HandleProjectileBounce
+	);
 }
 
 void AStoneProjectile::Launch(
@@ -57,6 +63,17 @@ void AStoneProjectile::Launch(
 	}
 
 	const float SafeSpeed = FMath::Max(0.0f, Speed);
+	bHasDamagedZombie = false;
+
+	if (AActor* ProjectileOwner = GetOwner())
+	{
+		Collision->IgnoreActorWhenMoving(ProjectileOwner, true);
+	}
+
+	if (APawn* ProjectileInstigator = GetInstigator())
+	{
+		Collision->IgnoreActorWhenMoving(ProjectileInstigator, true);
+	}
 
 	ProjectileMovement->InitialSpeed = SafeSpeed;
 	ProjectileMovement->MaxSpeed =
@@ -66,4 +83,28 @@ void AStoneProjectile::Launch(
 		Direction.GetSafeNormal() * SafeSpeed;
 
 	ProjectileMovement->Activate(true);
+}
+
+void AStoneProjectile::HandleProjectileBounce(
+	const FHitResult& ImpactResult,
+	const FVector& ImpactVelocity
+)
+{
+	if (bHasDamagedZombie
+		|| ImpactVelocity.SizeSquared()
+			< FMath::Square(MinimumDamageSpeed))
+	{
+		return;
+	}
+
+	AZombieCharacter* Zombie =
+		Cast<AZombieCharacter>(ImpactResult.GetActor());
+
+	if (!Zombie)
+	{
+		return;
+	}
+
+	bHasDamagedZombie = true;
+	Zombie->ReceiveStoneImpact(ImpactResult, ImpactVelocity);
 }
