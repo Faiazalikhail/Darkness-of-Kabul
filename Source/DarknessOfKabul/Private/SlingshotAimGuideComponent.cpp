@@ -1,188 +1,162 @@
 #include "SlingshotAimGuideComponent.h"
 
-#include "Camera/CameraComponent.h"
-#include "DrawDebugHelpers.h"
+#include "CollisionQueryParams.h"
+#include "CollisionShape.h"
 #include "Engine/World.h"
+#include "ZombieCharacter.h"
+
+namespace
+{
+	/** Matches the bounce terms used by UProjectileMovementComponent. */
+	FVector CalculateBounceVelocity(
+		FVector Velocity,
+		const FVector& SurfaceNormal,
+		const float Bounciness,
+		const float Friction)
+	{
+		const float VelocityDotNormal = FVector::DotProduct(
+			Velocity,
+			SurfaceNormal
+		);
+
+		if (VelocityDotNormal > 0.0f)
+		{
+			return Velocity;
+		}
+
+		const FVector ReflectedNormal = SurfaceNormal * -VelocityDotNormal;
+		Velocity += ReflectedNormal;
+
+		const float TangentialSpeed = Velocity.Size();
+		const float ScaledFriction = TangentialSpeed > KINDA_SMALL_NUMBER
+			? FMath::Clamp(
+				-VelocityDotNormal / TangentialSpeed,
+				0.0f,
+				1.0f
+			) * Friction
+			: Friction;
+
+		Velocity *= FMath::Clamp(1.0f - ScaledFriction, 0.0f, 1.0f);
+		Velocity += ReflectedNormal * FMath::Max(Bounciness, 0.0f);
+		return Velocity;
+	}
+}
 
 USlingshotAimGuideComponent::USlingshotAimGuideComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
 }
 
-void USlingshotAimGuideComponent::DrawGuide(
-	const UCameraComponent* Camera,
-	const bool bIsAiming,
-	const bool bIsCharging,
-	const float HeldTime,
-	const float MinimumChargeTime,
-	const float MaximumChargeTime,
-	const float MinimumLaunchSpeed,
-	const float MaximumLaunchSpeed
+bool USlingshotAimGuideComponent::PredictTrajectory(
+	const FVector& StartLocation,
+	const FVector& LaunchVelocity,
+	const float ProjectileRadius,
+	const float ProjectileGravityScale,
+	const float Bounciness,
+	const float Friction,
+	const int32 MaximumCollisionCount,
+	const float MaximumSimulationTime,
+	const AActor* ActorToIgnore,
+	FSlingshotTrajectoryPrediction& OutPrediction
 ) const
 {
 	UWorld* World = GetWorld();
-	AActor* Owner = GetOwner();
+	OutPrediction = FSlingshotTrajectoryPrediction();
 
-	if (!World || !Camera || !Owner || !bIsAiming)
+	if (!World
+		|| LaunchVelocity.IsNearlyZero()
+		|| MaximumCollisionCount <= 0
+		|| MaximumSimulationTime <= 0.0f)
 	{
-		return;
+		return false;
 	}
-
-	const FVector CameraLocation = Camera->GetComponentLocation();
-	const FVector CameraForward = Camera->GetForwardVector();
-	const FVector CameraUp = Camera->GetUpVector();
-	const FVector CameraRight = Camera->GetRightVector();
 
 	FCollisionQueryParams QueryParameters(
-		SCENE_QUERY_STAT(SlingshotAimGuide),
+		SCENE_QUERY_STAT(SlingshotTrajectory),
 		false,
-		Owner
+		ActorToIgnore
 	);
 
-	QueryParameters.AddIgnoredActor(Owner);
-
-	// Part 1: the small red dot shows the straight camera target.
-	const FVector StraightTraceEnd =
-		CameraLocation + CameraForward * TargetDistance;
-
-	FHitResult StraightHit;
-
-	const bool bStraightHit =
-		World->LineTraceSingleByChannel(
-			StraightHit,
-			CameraLocation,
-			StraightTraceEnd,
-			ECC_Visibility,
-			QueryParameters
-		);
-
-	const FVector TargetPoint =
-		bStraightHit ? StraightHit.ImpactPoint : StraightTraceEnd;
-
-	DrawDebugPoint(
-		World,
-		TargetPoint,
-		6.0f,
-		FColor::Red,
-		false,
-		0.0f,
-		0
-	);
-
-	// Part 2: the curved guide begins below the target dot.
-	const FVector TrajectoryStart =
-		CameraLocation
-		+ CameraForward * TrajectoryStartDistance
-		- CameraUp * TrajectoryVerticalOffset
-		- CameraRight * TrajectoryLeftOffset;
-
-	const FVector AimDirection =
-		(TargetPoint - TrajectoryStart).GetSafeNormal();
-
-	const float SafeMinimumTime =
-		FMath::Max(MinimumChargeTime, KINDA_SMALL_NUMBER);
-
-	const float ReadyAmount =
-		bIsCharging
-			? FMath::Clamp(HeldTime / SafeMinimumTime, 0.0f, 1.0f)
-			: 0.0f;
-
-	const float FullChargeRange =
-		FMath::Max(
-			MaximumChargeTime - MinimumChargeTime,
-			KINDA_SMALL_NUMBER
-		);
-
-	const float FullChargeAmount =
-		bIsCharging
-			? FMath::Clamp(
-				(HeldTime - MinimumChargeTime) / FullChargeRange,
-				0.0f,
-				1.0f
-			)
-			: 0.0f;
-
-	// Before the shot is ready, preview a weak stone that drops quickly.
-	// After it becomes ready, the increased speed naturally flattens the path.
-	const float WeakPreviewSpeed = MinimumLaunchSpeed * 0.25f;
-
-	const float PreviewSpeed =
-		ReadyAmount < 1.0f
-			? FMath::Lerp(
-				WeakPreviewSpeed,
-				MinimumLaunchSpeed,
-				ReadyAmount
-			)
-			: FMath::Lerp(
-				MinimumLaunchSpeed,
-				MaximumLaunchSpeed,
-				FullChargeAmount
-			);
-
-	const bool bShotIsReady =
-		bIsCharging && HeldTime >= MinimumChargeTime;
-
-	const FColor GuideColor =
-		bShotIsReady
-			? FColor(70, 255, 90)
-			: FColor(255, 125, 25);
-
-	const FVector LaunchVelocity = AimDirection * PreviewSpeed;
-	const FVector Gravity(0.0f, 0.0f, World->GetGravityZ());
-
-	FVector PreviousPoint = TrajectoryStart;
-
-	for (int32 PointIndex = 1;
-		PointIndex <= TrajectoryPointCount;
-		++PointIndex)
+	if (ActorToIgnore)
 	{
-		const float Time = PointIndex * TrajectoryTimeStep;
+		QueryParameters.AddIgnoredActor(ActorToIgnore);
+	}
 
-		const FVector NextPoint =
-			TrajectoryStart
-			+ LaunchVelocity * Time
-			+ 0.5f * Gravity * FMath::Square(Time);
+	const float Radius = FMath::Max(0.0f, ProjectileRadius);
+	const FCollisionShape Shape = FCollisionShape::MakeSphere(Radius);
+	const FVector Gravity(
+		0.0f,
+		0.0f,
+		World->GetGravityZ() * ProjectileGravityScale
+	);
+	const float TimeStep = 1.0f / FMath::Max(10.0f, SimulationFrequency);
+	const int32 MaximumSteps = FMath::CeilToInt(
+		MaximumSimulationTime / TimeStep
+	);
 
-		FHitResult PathHit;
+	FVector Position = StartLocation;
+	FVector Velocity = LaunchVelocity;
 
-		const bool bPathHit =
-			World->LineTraceSingleByChannel(
-				PathHit,
-				PreviousPoint,
-				NextPoint,
-				ECC_Visibility,
-				QueryParameters
-			);
+	for (int32 Step = 0; Step < MaximumSteps; ++Step)
+	{
+		const FVector NextVelocity = Velocity + Gravity * TimeStep;
+		const FVector NextPosition = Position
+			+ (Velocity + NextVelocity) * (0.5f * TimeStep);
 
-		const FVector DisplayPoint =
-			bPathHit ? PathHit.ImpactPoint : NextPoint;
-
-		DrawDebugLine(
-			World,
-			PreviousPoint,
-			DisplayPoint,
-			GuideColor,
-			false,
-			0.0f,
-			0,
-			bShotIsReady ? 3.0f : 2.0f
-		);
-
-		DrawDebugPoint(
-			World,
-			DisplayPoint,
-			bShotIsReady ? 5.0f : 3.0f,
-			GuideColor,
-			false,
-			0.0f,
-			0
-		);
-
-		if (bPathHit)
+		FHitResult Hit;
+		if (!World->SweepSingleByChannel(
+			Hit,
+			Position,
+			NextPosition,
+			FQuat::Identity,
+			ECC_GameTraceChannel1,
+			Shape,
+			QueryParameters))
 		{
-			break;
+			Position = NextPosition;
+			Velocity = NextVelocity;
+			continue;
 		}
 
-		PreviousPoint = NextPoint;
+		const FVector ImpactPoint = Hit.ImpactPoint;
+		const FVector IncomingDirection = NextVelocity.GetSafeNormal();
+		const FVector SurfaceNormal = Hit.ImpactNormal.GetSafeNormal();
+		const FVector BounceVelocity = CalculateBounceVelocity(
+			NextVelocity,
+			SurfaceNormal,
+			Bounciness,
+			Friction
+		);
+
+		FSlingshotTrajectoryImpact& Impact =
+			OutPrediction.Impacts.AddDefaulted_GetRef();
+		Impact.ImpactPoint = ImpactPoint;
+		Impact.IncomingGuidePoint =
+			ImpactPoint - IncomingDirection * AngleGuideLength;
+		Impact.OutgoingGuidePoint = ImpactPoint
+			+ BounceVelocity.GetSafeNormal() * AngleGuideLength;
+		Impact.HitActor = Hit.GetActor();
+		Impact.bHitZombie = Cast<AZombieCharacter>(Hit.GetActor()) != nullptr;
+		Impact.bHasOutgoingSegment = !Impact.bHitZombie
+			&& OutPrediction.Impacts.Num() < MaximumCollisionCount
+			&& !BounceVelocity.IsNearlyZero();
+
+		OutPrediction.FinalPoint = ImpactPoint;
+		OutPrediction.bEndedOnCollision = true;
+
+		if (Impact.bHitZombie
+			|| OutPrediction.Impacts.Num() >= MaximumCollisionCount
+			|| BounceVelocity.SizeSquared() < FMath::Square(250.0f))
+		{
+			return true;
+		}
+
+		Position = ImpactPoint
+			+ SurfaceNormal * FMath::Max(Radius + 0.5f, 1.0f);
+		Velocity = BounceVelocity;
 	}
+
+	OutPrediction.FinalPoint = Position;
+	OutPrediction.bEndedOnCollision = false;
+	return true;
 }

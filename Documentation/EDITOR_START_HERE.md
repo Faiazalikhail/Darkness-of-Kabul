@@ -1,31 +1,27 @@
-# Editor and Level Guide
+# Editor and Playtest Guide
 
 1. Open `DarknessOfKabul.uproject` in Unreal Engine 5.6.1.
-2. Confirm the open map is `L_TargetPractice`.
-3. Press **Play** and click the viewport.
-4. Test WASD, mouse look, Space, Left Shift, and Left Ctrl.
+2. Open `/Game/Maps/L_TargetPractice` if it is not already active.
+3. Press Play and click the game window.
+4. Continue through the welcome screen and choose New Game.
 
-## Editing the traversal area
+## Core playtest
 
-Select `TraversalCourse` in the World Outliner. Its actor transform is editable like any other Unreal actor. It contains:
+1. Hold right mouse to aim.
+2. Hold left mouse until the charge changes from orange to green.
+3. Aim directly at a zombie and confirm the marker sits on the body without a full trajectory line.
+4. Aim at a wall and confirm the preview shows a short angle at the first impact and a final marker after the bounce.
+5. Release and confirm the stone stops after the second collision at the latest.
+6. Hold a pull for 3.5 seconds and confirm the pull cancels, aim resets, and the camera kicks.
+7. Move away from the start, press `R`, and confirm the player, targets, stones, and objective progress reset.
 
-- three progressively higher jump hurdles;
-- a crouch tunnel with roof and walls;
-- `LowClimbBlock`, `MediumClimbBlock`, and `HighClimbBlock` as valid climbs;
-- `ImpossibleClimbBlock` as a deliberately invalid climb;
-- `LandingDropPlatform` for landing-impact tests;
-- floating guide text for each section.
+## UI playtest
 
-To adjust individual components visually, create a Blueprint child of `TraversalCourse` and edit the named components in the Blueprint viewport. You can also replace the cubes with ordinary level geometry while keeping the same test heights.
+- Main menu: New Game works, Continue is disabled, Settings opens, and Leave exits.
+- Settings: volume, look sensitivity, field of view, and display mode update correctly.
+- Pause: Escape opens the menu; Resume, Play Again, Settings, Main Menu, and Leave work.
+- Completion: defeating every zombie and hitting every wobble target opens the thank-you screen.
 
-## Expected movement
+## Level editing
 
-- Walking has gradual acceleration and firm braking.
-- Sprinting is faster but still controlled.
-- Crouching reduces the collision capsule and uses the slowest speed.
-- Space jumps when no valid ledge is detected.
-- Space climbs a nearby ledge between 40 and 140 cm when the top is walkable and the capsule has room.
-- The 180 cm block must reject climbing.
-- Dropping from the raised platform produces a short camera impact response.
-
-Keep this map readable as a movement and traversal test area.
+Placed zombies are discovered automatically. Actors whose class name contains `WobbleTarget` are discovered as wobble objectives. Adding or removing either type updates the required totals the next time the level starts.

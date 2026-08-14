@@ -32,6 +32,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Projectile")
 	void Launch(const FVector& Direction, float Speed);
 
+	float GetCollisionRadius() const;
+	float GetProjectileGravityScale() const;
+	float GetBounciness() const;
+	float GetFriction() const;
+	float GetMaximumLifetime() const { return MaximumLifetime; }
+	int32 GetMaximumCollisionCount() const { return MaximumCollisionCount; }
+
 private:
 	/** Routes the first damaging zombie impact to the struck bone. */
 	UFUNCTION()
@@ -39,6 +46,9 @@ private:
 		const FHitResult& ImpactResult,
 		const FVector& ImpactVelocity
 	);
+
+	UFUNCTION()
+	void HandleProjectileStop(const FHitResult& ImpactResult);
 
 	/** Physical collision shape and root component. */
 	UPROPERTY(
@@ -76,6 +86,34 @@ private:
 	)
 	float MinimumDamageSpeed = 800.0f;
 
+	/** Bounds the readable ricochet sequence and prevents endless vibration. */
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Projectile|Bounce",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0")
+	)
+	int32 MaximumCollisionCount = 2;
+
+	/** Hard lifetime for stones that never reach the movement stop threshold. */
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Projectile|Lifetime",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.1")
+	)
+	float MaximumLifetime = 8.0f;
+
+	/** Brief delay keeps the final resting impact readable before cleanup. */
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Projectile|Lifetime",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0")
+	)
+	float StoppedLifetime = 0.75f;
+
 	/** A single stone can damage only one zombie once. */
 	bool bHasDamagedZombie = false;
+	int32 CollisionCount = 0;
 };

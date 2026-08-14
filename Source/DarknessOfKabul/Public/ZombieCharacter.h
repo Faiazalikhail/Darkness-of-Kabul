@@ -43,6 +43,10 @@ public:
 		const FVector& ImpactVelocity
 	);
 
+	/** Restores this placed target for another portfolio demonstration pass. */
+	UFUNCTION(BlueprintCallable, Category = "Zombie|Reset")
+	void ResetReactionState();
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -128,13 +132,13 @@ protected:
 	)
 	EZombieHitZone LastHitZone = EZombieHitZone::Torso;
 
-	/** Easy prototype feedback; disable later when VFX replaces it. */
+	/** Optional editor/development diagnostic; never shown in Shipping. */
 	UPROPERTY(
 		EditDefaultsOnly,
 		BlueprintReadOnly,
 		Category = "Zombie|Debug"
 	)
-	bool bShowHitDebug = true;
+	bool bShowHitDebug = false;
 
 	/** Use this event to select a hit animation and spawn impact effects. */
 	UFUNCTION(
@@ -188,4 +192,12 @@ private:
 	EZombiePhysicalState StateBeforeStagger =
 		EZombiePhysicalState::Standing;
 	float StandingMaxWalkSpeed = 300.0f;
+	FTransform InitialActorTransform;
+	FTransform InitialMeshRelativeTransform;
+	FName InitialCapsuleCollisionProfile;
+	FName InitialMeshCollisionProfile;
+	ECollisionEnabled::Type InitialCapsuleCollisionEnabled =
+		ECollisionEnabled::QueryAndPhysics;
+	ECollisionEnabled::Type InitialMeshCollisionEnabled =
+		ECollisionEnabled::QueryAndPhysics;
 };

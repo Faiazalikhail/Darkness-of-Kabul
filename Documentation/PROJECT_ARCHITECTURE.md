@@ -4,31 +4,45 @@
 
 ```mermaid
 flowchart LR
-    Hardware[Keyboard and mouse] --> Mapping[Enhanced Input mappings]
-    Mapping --> Player[APlayerCharacter]
-    Player --> Movement[UCharacterMovementComponent]
-    Movement --> Collision[Capsule and world collision]
-    Course[ATraversalCourse] --> Geometry[Editable mesh and text components]
+    Input[Player input] --> Player[APlayerCharacter]
+    Player --> Aim[Slingshot prediction]
+    Player --> Stone[AStoneProjectile]
+    Aim --> Markers[UMG impact markers]
+    Stone --> Targets[Zombie and wobble targets]
+    Targets --> Rules[AKabulGameMode objectives]
+    Rules --> UI[Completion screen]
 ```
 
-## Class responsibilities
+## Responsibilities
 
-| Class | Responsibility |
+| System | Responsibility |
 |---|---|
-| `APlayerCharacter` | camera, input binding, walking, looking, jumping, sprinting, crouching, landing feedback, movement-noise value, and ledge climbing |
-| `AKabulPlayerController` | player-specific UI and controller responsibilities when needed |
-| `AKabulGameMode` | selects the default pawn and player controller |
-| `ATraversalCourse` | editable traversal-test geometry and floating guide text |
-| `USlingshotComponent` | isolated slingshot behavior; currently a small extension point |
-| `AStoneProjectile`, `AStonePickup`, `AZombieCharacter`, and `UKabulHUDWidget` | separate gameplay domains that do not belong in locomotion code |
+| `APlayerCharacter` | first-person movement, slingshot input, overdraw reset, projectile launch, settings values, and local UI creation |
+| `USlingshotAimGuideComponent` | simulates the same gravity and bounce values as the real stone and returns at most two impacts |
+| `AStoneProjectile` | swept movement, two-collision limit, target notification, damage delivery, and timed cleanup |
+| `AZombieCharacter` | body-zone damage, stagger, crawling, ragdoll death, and reset |
+| `AKabulGameMode` | discovers placed objectives, tracks unique completions, resets progress, and triggers the ending |
+| `UKabulPrototypeUI` | loading, welcome, menus, settings, gameplay readout, compact impact markers, pause, and completion |
 
-## Ownership rules
+## Important design decisions
 
-- The character translates player intent into movement requests.
-- `UCharacterMovementComponent` owns acceleration, velocity, gravity, floor detection, and collision-aware motion.
-- The level owns environment layout and art.
-- `ATraversalCourse` supplies reusable test geometry, not game rules.
-- Game-wide rules belong in `AKabulGameMode`.
-- UI belongs in the HUD/widget layer, not in the movement class.
+- The predictor and real projectile read the same radius, gravity, bounciness, friction, lifetime, collision channel, and collision limit.
+- The trajectory result contains impacts rather than a long list of display points. UMG therefore draws only the information the player needs: a body marker, a short bounce angle, and the final impact.
+- Objective progress uses sets of actor references. Repeatedly hitting one target cannot complete another target's objective.
+- The local player creates the UMG widget. This keeps the interface working even when an existing Blueprint game mode has older serialized HUD settings.
+- Reset restores the player start transform, stones, zombies, wobble targets, and objective progress without reloading the level.
 
-This separation keeps each system testable and prevents movement, combat, level geometry, and UI from becoming one large class.
+## Screen flow
+
+```mermaid
+flowchart LR
+    Loading --> Welcome --> MainMenu[Main menu]
+    MainMenu --> Settings
+    Settings --> MainMenu
+    MainMenu --> Gameplay
+    Gameplay --> Pause
+    Pause --> Gameplay
+    Pause --> Settings
+    Gameplay --> Completed[Completion]
+    Completed --> Gameplay
+```

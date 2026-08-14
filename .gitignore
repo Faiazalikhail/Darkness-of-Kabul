@@ -46,3 +46,8 @@ Desktop.ini
 
 # Local scratch folders used by tools
 .codex-doc-review/
+_CleanupReview/
+
+# Reproducible portfolio package output; keep BUILD_NOTES.md tracked.
+/deliverables/windows/DarknessOfKabul_Windows_Portfolio/
+/deliverables/windows/*.zip

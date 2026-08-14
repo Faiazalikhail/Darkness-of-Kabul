@@ -3,7 +3,9 @@
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/Engine.h"
+#include "GameFramework/Controller.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "KabulGameMode.h"
 #include "TimerManager.h"
 
 AZombieCharacter::AZombieCharacter()
@@ -30,6 +32,14 @@ void AZombieCharacter::BeginPlay()
 
 	CurrentHealth = MaxHealth;
 	PhysicalState = EZombiePhysicalState::Standing;
+	InitialActorTransform = GetActorTransform();
+	InitialMeshRelativeTransform = GetMesh()->GetRelativeTransform();
+	InitialCapsuleCollisionProfile =
+		GetCapsuleComponent()->GetCollisionProfileName();
+	InitialMeshCollisionProfile = GetMesh()->GetCollisionProfileName();
+	InitialCapsuleCollisionEnabled =
+		GetCapsuleComponent()->GetCollisionEnabled();
+	InitialMeshCollisionEnabled = GetMesh()->GetCollisionEnabled();
 
 	if (UCharacterMovementComponent* Movement = GetCharacterMovement())
 	{
@@ -59,7 +69,22 @@ void AZombieCharacter::ReceiveStoneImpact(
 		return;
 	}
 
-	const EZombieHitZone HitZone = ClassifyHitBone(Hit.BoneName);
+	FHitResult ResolvedHit = Hit;
+
+	if (ResolvedHit.BoneName.IsNone() && GetMesh())
+	{
+		ResolvedHit.BoneName = GetMesh()->FindClosestBone(
+			ResolvedHit.bBlockingHit
+				? ResolvedHit.ImpactPoint
+				: GetActorLocation(),
+			nullptr,
+			0.0f,
+			true
+		);
+	}
+
+	const EZombieHitZone HitZone =
+		ClassifyHitBone(ResolvedHit.BoneName);
 	LastHitZone = HitZone;
 
 	float Damage = 0.0f;
@@ -84,12 +109,21 @@ void AZombieCharacter::ReceiveStoneImpact(
 	}
 
 	CurrentHealth = FMath::Max(0.0f, CurrentHealth - Damage);
-	ShowHitDebug(HitZone, Hit.BoneName);
-	BP_OnZombieHit(HitZone, Hit.BoneName, Damage, Hit.ImpactPoint);
+	const FVector ImpactPoint = ResolvedHit.bBlockingHit
+		? ResolvedHit.ImpactPoint
+		: GetActorLocation();
+
+	ShowHitDebug(HitZone, ResolvedHit.BoneName);
+	BP_OnZombieHit(
+		HitZone,
+		ResolvedHit.BoneName,
+		Damage,
+		ImpactPoint
+	);
 
 	if (HitZone == EZombieHitZone::Head || CurrentHealth <= 0.0f)
 	{
-		Die(HitZone, Hit, ImpactVelocity);
+		Die(HitZone, ResolvedHit, ImpactVelocity);
 		return;
 	}
 
@@ -214,8 +248,14 @@ void AZombieCharacter::Die(
 	}
 
 	GetWorldTimerManager().ClearTimer(StaggerTimerHandle);
-	BP_OnZombieDeath(FatalZone, Hit.ImpactPoint);
 	SetPhysicalState(EZombiePhysicalState::Dead);
+	BP_OnZombieDeath(FatalZone, Hit.ImpactPoint);
+
+	if (AKabulGameMode* GameMode =
+		GetWorld() ? GetWorld()->GetAuthGameMode<AKabulGameMode>() : nullptr)
+	{
+		GameMode->NotifyZombieDefeated(this);
+	}
 
 	if (UCharacterMovementComponent* Movement = GetCharacterMovement())
 	{
@@ -223,9 +263,23 @@ void AZombieCharacter::Die(
 		Movement->DisableMovement();
 	}
 
+	if (AController* ZombieController = GetController())
+	{
+		ZombieController->StopMovement();
+	}
+
 	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
 	USkeletalMeshComponent* ZombieMesh = GetMesh();
+
+	if (!ZombieMesh)
+	{
+		return;
+	}
+
+	ZombieMesh->DetachFromComponent(
+		FDetachmentTransformRules::KeepWorldTransform
+	);
 	ZombieMesh->SetCollisionProfileName(TEXT("Ragdoll"));
 	ZombieMesh->SetAllBodiesSimulatePhysics(true);
 	ZombieMesh->SetSimulatePhysics(true);
@@ -239,6 +293,61 @@ void AZombieCharacter::Die(
 		Hit.ImpactPoint,
 		Hit.BoneName
 	);
+}
+
+void AZombieCharacter::ResetReactionState()
+{
+	GetWorldTimerManager().ClearTimer(StaggerTimerHandle);
+
+	USkeletalMeshComponent* ZombieMesh = GetMesh();
+	UCapsuleComponent* Capsule = GetCapsuleComponent();
+
+	if (ZombieMesh)
+	{
+		ZombieMesh->SetSimulatePhysics(false);
+		ZombieMesh->SetAllBodiesSimulatePhysics(false);
+		ZombieMesh->SetPhysicsBlendWeight(0.0f);
+		ZombieMesh->AttachToComponent(
+			Capsule,
+			FAttachmentTransformRules::KeepRelativeTransform
+		);
+		ZombieMesh->SetRelativeTransform(InitialMeshRelativeTransform);
+		ZombieMesh->SetCollisionProfileName(InitialMeshCollisionProfile);
+		ZombieMesh->SetCollisionEnabled(InitialMeshCollisionEnabled);
+		ZombieMesh->SetCollisionResponseToChannel(
+			ECC_GameTraceChannel1,
+			ECR_Block
+		);
+	}
+
+	if (Capsule)
+	{
+		Capsule->SetCollisionProfileName(InitialCapsuleCollisionProfile);
+		Capsule->SetCollisionEnabled(InitialCapsuleCollisionEnabled);
+		Capsule->SetCollisionResponseToChannel(
+			ECC_GameTraceChannel1,
+			ECR_Ignore
+		);
+	}
+
+	SetActorTransform(
+		InitialActorTransform,
+		false,
+		nullptr,
+		ETeleportType::TeleportPhysics
+	);
+
+	CurrentHealth = MaxHealth;
+	LastHitZone = EZombieHitZone::Torso;
+	StateBeforeStagger = EZombiePhysicalState::Standing;
+	SetPhysicalState(EZombiePhysicalState::Standing);
+
+	if (UCharacterMovementComponent* Movement = GetCharacterMovement())
+	{
+		Movement->SetMovementMode(MOVE_Walking);
+		Movement->StopMovementImmediately();
+		Movement->MaxWalkSpeed = StandingMaxWalkSpeed;
+	}
 }
 
 void AZombieCharacter::SetPhysicalState(
@@ -265,6 +374,8 @@ void AZombieCharacter::ShowHitDebug(
 		return;
 	}
 
+#if !UE_BUILD_SHIPPING
+
 	const FColor MessageColor =
 		HitZone == EZombieHitZone::Head
 			? FColor::Red
@@ -290,4 +401,5 @@ void AZombieCharacter::ShowHitDebug(
 			CurrentHealth
 		)
 	);
+#endif
 }
