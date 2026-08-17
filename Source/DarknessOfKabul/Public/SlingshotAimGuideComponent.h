@@ -2,18 +2,13 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "SlingshotTrajectoryTypes.h"
 #include "SlingshotAimGuideComponent.generated.h"
 
-class UCameraComponent;
-
 /**
- * Draws the two visual parts of the slingshot aiming guide:
- *
- * 1. A small red dot at the camera's straight, gravity-free target.
- * 2. A lower curved path showing how the stone is expected to fly.
- *
- * This component only draws information. It does not move the camera,
- * change the player mesh, or launch the projectile.
+ * Produces the collision-aware path used by the presentation HUD.
+ * Rendering stays in the HUD so the Shipping build does not depend on
+ * temporary DrawDebug output.
  */
 UCLASS(ClassGroup = (Weapon), meta = (BlueprintSpawnableComponent))
 class DARKNESSOFKABUL_API USlingshotAimGuideComponent
@@ -24,37 +19,24 @@ class DARKNESSOFKABUL_API USlingshotAimGuideComponent
 public:
 	USlingshotAimGuideComponent();
 
-	void DrawGuide(
-		const UCameraComponent* Camera,
-		bool bIsAiming,
-		bool bIsCharging,
-		float HeldTime,
-		float MinimumChargeTime,
-		float MaximumChargeTime,
-		float MinimumLaunchSpeed,
-		float MaximumLaunchSpeed
+	bool PredictTrajectory(
+		const FVector& StartLocation,
+		const FVector& LaunchVelocity,
+		float ProjectileRadius,
+		float ProjectileGravityScale,
+		float Bounciness,
+		float Friction,
+		int32 MaximumCollisionCount,
+		float MaximumSimulationTime,
+		const AActor* ActorToIgnore,
+		FSlingshotTrajectoryPrediction& OutPrediction
 	) const;
 
 private:
-	/** Maximum distance checked by the gravity-free red target dot. */
-	UPROPERTY(EditDefaultsOnly, Category = "Aim Guide", meta = (ClampMin = "100"))
-	float TargetDistance = 8000.0f;
+	UPROPERTY(EditDefaultsOnly, Category = "Aim Guide", meta = (ClampMin = "0.1"))
+	float SimulationFrequency = 40.0f;
 
-	/** Distance in front of the camera where the curved guide begins. */
-	UPROPERTY(EditDefaultsOnly, Category = "Aim Guide", meta = (ClampMin = "0"))
-	float TrajectoryStartDistance = 60.0f;
-
-	/** Keeps the curved guide visibly below the red target dot. */
-	UPROPERTY(EditDefaultsOnly, Category = "Aim Guide", meta = (ClampMin = "0"))
-	float TrajectoryVerticalOffset = 24.0f;
-
-	/** Moves the curved guide toward the pulled stone on the left side. */
-	UPROPERTY(EditDefaultsOnly, Category = "Aim Guide", meta = (ClampMin = "0"))
-	float TrajectoryLeftOffset = 45.0f;
-
-	UPROPERTY(EditDefaultsOnly, Category = "Aim Guide", meta = (ClampMin = "2"))
-	int32 TrajectoryPointCount = 18;
-
-	UPROPERTY(EditDefaultsOnly, Category = "Aim Guide", meta = (ClampMin = "0.001"))
-	float TrajectoryTimeStep = 0.009f;
+	/** Length of the two small line pieces that communicate a bounce angle. */
+	UPROPERTY(EditDefaultsOnly, Category = "Aim Guide", meta = (ClampMin = "5.0"))
+	float AngleGuideLength = 55.0f;
 };

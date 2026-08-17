@@ -13,9 +13,15 @@ public class DarknessOfKabul : ModuleRules
 			"Engine",
 			"InputCore",
 			"EnhancedInput",
-			"UMG"
+			"UMG",
+			"AIModule",
+			"NavigationSystem"
 		});
 
-		// Add private dependencies only when an implementation needs them.
+		PrivateDependencyModuleNames.AddRange(new string[]
+		{
+			"Slate",
+			"SlateCore"
+		});
 	}
 }

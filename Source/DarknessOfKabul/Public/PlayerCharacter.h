@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "SlingshotTrajectoryTypes.h"
 #include "PlayerCharacter.generated.h"
 
 class UInputMappingContext;
@@ -9,6 +10,7 @@ class UInputAction;
 class UCameraComponent;
 class USkeletalMeshComponent;
 class USlingshotAimGuideComponent;
+class UKabulPrototypeUI;
 class AStoneProjectile;
 struct FInputActionValue;
 
@@ -36,6 +38,50 @@ public:
 	/** Current pull amount from 0 (not pulled) to 1 (fully pulled). */
 	UFUNCTION(BlueprintPure, Category = "Weapon|Slingshot")
 	float GetSlingshotPullAmount() const;
+
+	/** True once releasing the current pull will launch a stone. */
+	UFUNCTION(BlueprintPure, Category = "Weapon|Slingshot")
+	bool IsSlingshotShotReady() const;
+
+	/** Up to two predicted impacts rendered as markers and short angle pieces. */
+	bool GetSlingshotTrajectory(
+		FSlingshotTrajectoryPrediction& OutPrediction
+	) const;
+
+	/** Remaining time for the short reset confirmation shown by the HUD. */
+	float GetResetFeedbackTimeRemaining() const;
+
+	/** Settings-menu controls. */
+	void SetLookSensitivity(float NewSensitivity);
+	void SetFirstPersonFieldOfView(float NewFieldOfView);
+	float GetLookSensitivity() const { return LookSensitivity; }
+
+	/** Restarts the player, placed targets, objectives, and stones. */
+	void RestartPrototype();
+
+	/** R asks first so a mis-press cannot wipe a run. Opens the prompt. */
+	void RequestPrototypeReset();
+
+	/** Called by the confirmation screen once the player accepts. */
+	void ConfirmPrototypeReset();
+	void TogglePrototypePause();
+	void ShowPrototypeCompletion();
+
+	/** Applies one zombie swing. Reaching zero health ends the run. */
+	UFUNCTION(BlueprintCallable, Category = "Player|Health")
+	void ApplyZombieDamage(float Damage);
+
+	/** Remaining health from 0 to 1, for the HUD bar. */
+	UFUNCTION(BlueprintPure, Category = "Player|Health")
+	float GetPlayerHealthPercent() const;
+
+	/** True once the player has been killed and the run is over. */
+	UFUNCTION(BlueprintPure, Category = "Player|Health")
+	bool IsPlayerDead() const { return bPlayerDead; }
+
+	/** Seconds since the last swing landed. Drives the HUD damage flash. */
+	UFUNCTION(BlueprintPure, Category = "Player|Health")
+	float GetTimeSinceDamaged() const;
 
 	/** Multiplier reserved for future footsteps or AI hearing. Crouching is quietest. */
 	UFUNCTION(BlueprintPure, Category = "Movement|Noise")
@@ -133,14 +179,22 @@ private:
 	)
 	float MaximumChargeTime = 2.5f;
 
-	/** Extra time allowed at full strength before the pull fails. */
+	/** Old overdraw mechanic: a held pull fails and shakes the camera here. */
 	UPROPERTY(
 		EditDefaultsOnly,
 		BlueprintReadOnly,
 		Category = "Weapon|Slingshot",
-		meta = (AllowPrivateAccess = "true", ClampMin = "0")
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.1")
 	)
-	float OverdrawGraceTime = 0.6f;
+	float MaximumDrawDuration = 3.5f;
+
+	/** Distance used to establish the camera-aligned aim point. */
+	UPROPERTY(EditDefaultsOnly, Category = "Weapon|Slingshot", meta = (ClampMin = "100.0"))
+	float AimTargetDistance = 8000.0f;
+
+	/** Offset from the camera to the pulled stone and trajectory origin. */
+	UPROPERTY(EditDefaultsOnly, Category = "Weapon|Slingshot")
+	FVector LaunchOffset = FVector(75.0f, -45.0f, -24.0f);
 
 	float ChargeStartTime = 0.0f;
 	bool bChargingStone = false;
@@ -150,6 +204,34 @@ private:
 	void FireStone(float LaunchSpeed);
 	float GetSlingshotHeldTime() const;
 	void UpdateSlingshotAim();
+	bool ComputeSlingshotAim(
+		FVector& OutLaunchLocation,
+		FVector& OutLaunchDirection
+	) const;
+	void ResetPrototype();
+	void InitializePrototypeUI();
+
+	/** Player health. Zombie swings are the only source of damage. */
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Player|Health",
+		meta = (AllowPrivateAccess = "true", ClampMin = "1.0")
+	)
+	float MaxPlayerHealth = 100.0f;
+
+	float CurrentPlayerHealth = 100.0f;
+	bool bPlayerDead = false;
+	float LastDamagedTime = -1000.0f;
+	void HandlePlayerDeath();
+
+	float ResetFeedbackEndTime = 0.0f;
+	float LookSensitivity = 1.0f;
+	FTransform InitialPlayerTransform;
+	FRotator InitialControlRotation = FRotator::ZeroRotator;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UKabulPrototypeUI> PrototypeUI;
 
 
 	/* --- LOCOMOTION TUNING --- */
@@ -234,6 +316,7 @@ private:
 	void StopSprint();
 	void StartCrouch();
 	void StopCrouch();
+	void TogglePauseMenu();
 	void UpdateLocomotionState();
 	bool TryClimb();
 };

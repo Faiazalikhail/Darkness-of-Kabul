@@ -11,9 +11,15 @@
 #include "InputAction.h"
 #include "InputCoreTypes.h"
 #include "InputMappingContext.h"
+#include "KinematicsLibrary.h"
+#include "KabulGameMode.h"
+#include "KabulPrototypeUI.h"
+#include "Kismet/GameplayStatics.h"
 #include "SlingshotAimGuideComponent.h"
 #include "StoneProjectile.h"
 #include "UObject/ConstructorHelpers.h"
+#include "ZombieCharacter.h"
+#include "EngineUtils.h"
 
 APlayerCharacter::APlayerCharacter()
 {
@@ -100,6 +106,12 @@ void APlayerCharacter::BeginPlay()
 
 	CameraRestingRotation =
 		FirstPersonCameraComponent->GetRelativeRotation();
+	InitialPlayerTransform = GetActorTransform();
+	InitialControlRotation = Controller
+		? Controller->GetControlRotation()
+		: GetActorRotation();
+
+	CurrentPlayerHealth = MaxPlayerHealth;
 
 	UpdateLocomotionState();
 }
@@ -107,6 +119,14 @@ void APlayerCharacter::BeginPlay()
 void APlayerCharacter::Tick(const float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+
+	// Some Blueprint game-mode spawn orders possess the pawn after its initial
+	// BeginPlay/PawnClientRestart callbacks. Retry until the local controller is
+	// available; the guard makes this a one-time UI initialization.
+	if (!PrototypeUI)
+	{
+		InitializePrototypeUI();
+	}
 
 	UpdateSlingshotAim();
 
@@ -165,6 +185,7 @@ void APlayerCharacter::Tick(const float DeltaSeconds)
 void APlayerCharacter::PawnClientRestart()
 {
 	Super::PawnClientRestart();
+	InitializePrototypeUI();
 
 	APlayerController* PlayerController =
 		Cast<APlayerController>(GetController());
@@ -332,7 +353,20 @@ void APlayerCharacter::SetupPlayerInputComponent(
 		&APlayerCharacter::StopAiming
 	);
 
+	PlayerInputComponent->BindKey(
+		EKeys::R,
+		IE_Pressed,
+		this,
+		&APlayerCharacter::RequestPrototypeReset
+	);
 
+	FInputKeyBinding& PauseBinding = PlayerInputComponent->BindKey(
+		EKeys::Escape,
+		IE_Pressed,
+		this,
+		&APlayerCharacter::TogglePauseMenu
+	);
+	PauseBinding.bExecuteWhenPaused = true;
 }
 
 
@@ -386,24 +420,13 @@ void APlayerCharacter::ReleaseChargedStone()
 		return;
 	}
 
-	const float ChargeRange =
-		FMath::Max(
-			MaximumChargeTime - MinimumChargeTime,
-			KINDA_SMALL_NUMBER
-		);
-
-	const float ChargeAmount =
-		FMath::Clamp(
-			(HeldTime - MinimumChargeTime) / ChargeRange,
-			0.0f,
-			0.3f
-		);
-
 	const float LaunchSpeed =
-		FMath::Lerp(
+		UKinematicsLibrary::CalculateLaunchSpeed(
+			HeldTime,
+			MinimumChargeTime,
+			MaximumChargeTime,
 			MinimumLaunchSpeed,
-			MaximumLaunchSpeed,
-			ChargeAmount
+			MaximumLaunchSpeed
 		);
 
 	FireStone(LaunchSpeed);
@@ -421,17 +444,15 @@ void APlayerCharacter::FireStone(const float LaunchSpeed)
 		return;
 	}
 
-	const FVector CameraLocation =
-		FirstPersonCameraComponent->GetComponentLocation();
+	FVector SpawnLocation;
+	FVector LaunchDirection;
 
-	const FVector CameraForward =
-		FirstPersonCameraComponent->GetForwardVector();
+	if (!ComputeSlingshotAim(SpawnLocation, LaunchDirection))
+	{
+		return;
+	}
 
-	const FVector SpawnLocation =
-		CameraLocation + CameraForward * 100.0f;
-
-	const FRotator SpawnRotation =
-		FirstPersonCameraComponent->GetComponentRotation();
+	const FRotator SpawnRotation = LaunchDirection.Rotation();
 
 	FActorSpawnParameters SpawnParameters;
 	SpawnParameters.Owner = this;
@@ -450,7 +471,7 @@ void APlayerCharacter::FireStone(const float LaunchSpeed)
 
 	if (FiredStone)
 	{
-		FiredStone->Launch(CameraForward, LaunchSpeed);
+		FiredStone->Launch(LaunchDirection, LaunchSpeed);
 	}
 }
 
@@ -461,17 +482,18 @@ float APlayerCharacter::GetSlingshotPullAmount() const
 		return 0.0f;
 	}
 
-	const float ChargeRange =
-		FMath::Max(
-			MaximumChargeTime - MinimumChargeTime,
-			KINDA_SMALL_NUMBER
-		);
-
-	return FMath::Clamp(
-		(GetSlingshotHeldTime() - MinimumChargeTime) / ChargeRange,
-		0.0f,
-		1.0f
+	return UKinematicsLibrary::CalculateChargeAmount(
+		GetSlingshotHeldTime(),
+		MinimumChargeTime,
+		MaximumChargeTime
 	);
+}
+
+bool APlayerCharacter::IsSlingshotShotReady() const
+{
+	return bIsAiming
+		&& bChargingStone
+		&& GetSlingshotHeldTime() >= MinimumChargeTime;
 }
 
 float APlayerCharacter::GetSlingshotHeldTime() const
@@ -491,34 +513,288 @@ float APlayerCharacter::GetSlingshotHeldTime() const
 
 void APlayerCharacter::UpdateSlingshotAim()
 {
-	const float HeldTime = GetSlingshotHeldTime();
-
-	// Pulling past the safe limit cancels the shot and forces the player
-	// to release and press the aim button again.
-	if (bIsAiming
-		&& bChargingStone
-		&& HeldTime >= MaximumChargeTime + OverdrawGraceTime)
+	if (!bIsAiming
+		|| !bChargingStone
+		|| GetSlingshotHeldTime() < MaximumDrawDuration)
 	{
-		bChargingStone = false;
-		bIsAiming = false;
-
-		LandingShakeElapsed = 0.0f;
-		LandingShakeStrength = 0.65f;
+		return;
 	}
 
-	if (SlingshotAimGuide)
+	// Preserve the original overdraw consequence: the pull fails, aim resets,
+	// and the camera kick tells the player to release before aiming again.
+	bChargingStone = false;
+	bIsAiming = false;
+	LandingShakeElapsed = 0.0f;
+	LandingShakeStrength = 0.65f;
+}
+
+bool APlayerCharacter::ComputeSlingshotAim(
+	FVector& OutLaunchLocation,
+	FVector& OutLaunchDirection
+) const
+{
+	const UWorld* World = GetWorld();
+
+	if (!World || !FirstPersonCameraComponent)
 	{
-		SlingshotAimGuide->DrawGuide(
-			FirstPersonCameraComponent,
-			bIsAiming,
-			bChargingStone,
+		return false;
+	}
+
+	const FVector CameraLocation =
+		FirstPersonCameraComponent->GetComponentLocation();
+	const FVector CameraForward =
+		FirstPersonCameraComponent->GetForwardVector();
+	const FVector CameraRight =
+		FirstPersonCameraComponent->GetRightVector();
+	const FVector CameraUp =
+		FirstPersonCameraComponent->GetUpVector();
+
+	const FVector TraceEnd =
+		CameraLocation + CameraForward * AimTargetDistance;
+
+	FCollisionQueryParams QueryParameters(
+		SCENE_QUERY_STAT(SlingshotAimTarget),
+		false,
+		this
+	);
+	QueryParameters.AddIgnoredActor(this);
+
+	FHitResult AimHit;
+	const bool bHit = World->LineTraceSingleByChannel(
+		AimHit,
+		CameraLocation,
+		TraceEnd,
+		ECC_Visibility,
+		QueryParameters
+	);
+
+	const FVector TargetPoint =
+		bHit ? AimHit.ImpactPoint : TraceEnd;
+
+	OutLaunchLocation =
+		CameraLocation
+		+ CameraForward * LaunchOffset.X
+		+ CameraRight * LaunchOffset.Y
+		+ CameraUp * LaunchOffset.Z;
+
+	OutLaunchDirection =
+		(TargetPoint - OutLaunchLocation).GetSafeNormal();
+
+	return !OutLaunchDirection.IsNearlyZero();
+}
+
+bool APlayerCharacter::GetSlingshotTrajectory(
+	FSlingshotTrajectoryPrediction& OutPrediction
+) const
+{
+	OutPrediction = FSlingshotTrajectoryPrediction();
+
+	if (!bIsAiming || !SlingshotAimGuide || !StoneProjectileClass)
+	{
+		return false;
+	}
+
+	FVector LaunchLocation;
+	FVector LaunchDirection;
+
+	if (!ComputeSlingshotAim(LaunchLocation, LaunchDirection))
+	{
+		return false;
+	}
+
+	const float HeldTime = GetSlingshotHeldTime();
+	const float ReadyAmount = FMath::Clamp(
+		HeldTime / FMath::Max(MinimumChargeTime, KINDA_SMALL_NUMBER),
+		0.0f,
+		1.0f
+	);
+	const float PreviewSpeed = IsSlingshotShotReady()
+		? UKinematicsLibrary::CalculateLaunchSpeed(
 			HeldTime,
 			MinimumChargeTime,
 			MaximumChargeTime,
 			MinimumLaunchSpeed,
 			MaximumLaunchSpeed
+		)
+		: FMath::Lerp(
+			MinimumLaunchSpeed * 0.35f,
+			MinimumLaunchSpeed,
+			ReadyAmount
 		);
+
+	const AStoneProjectile* ProjectileDefaults =
+		StoneProjectileClass->GetDefaultObject<AStoneProjectile>();
+
+	if (!ProjectileDefaults)
+	{
+		return false;
 	}
+
+	return SlingshotAimGuide->PredictTrajectory(
+		LaunchLocation,
+		LaunchDirection * PreviewSpeed,
+		ProjectileDefaults->GetCollisionRadius(),
+		ProjectileDefaults->GetProjectileGravityScale(),
+		ProjectileDefaults->GetBounciness(),
+		ProjectileDefaults->GetFriction(),
+		ProjectileDefaults->GetMaximumCollisionCount(),
+		ProjectileDefaults->GetMaximumLifetime(),
+		this,
+		OutPrediction
+	);
+}
+
+void APlayerCharacter::ResetPrototype()
+{
+	UWorld* World = GetWorld();
+
+	if (!World)
+	{
+		return;
+	}
+
+	bChargingStone = false;
+	bIsAiming = false;
+	LandingShakeElapsed = 0.0f;
+	LandingShakeStrength = 0.0f;
+
+	// Revive the player so reset also recovers from a game over.
+	CurrentPlayerHealth = MaxPlayerHealth;
+	bPlayerDead = false;
+	LastDamagedTime = -1000.0f;
+
+	GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+	GetCharacterMovement()->StopMovementImmediately();
+	SetActorTransform(
+		InitialPlayerTransform,
+		false,
+		nullptr,
+		ETeleportType::TeleportPhysics
+	);
+
+	if (Controller)
+	{
+		Controller->SetControlRotation(InitialControlRotation);
+	}
+
+	FirstPersonCameraComponent->SetRelativeLocation(CameraRestingLocation);
+	FirstPersonCameraComponent->SetRelativeRotation(CameraRestingRotation);
+
+	for (TActorIterator<AStoneProjectile> Projectile(World);
+		Projectile;
+		++Projectile)
+	{
+		Projectile->Destroy();
+	}
+
+	for (TActorIterator<AZombieCharacter> Zombie(World);
+		Zombie;
+		++Zombie)
+	{
+		Zombie->ResetReactionState();
+	}
+
+	if (AKabulGameMode* GameMode = World->GetAuthGameMode<AKabulGameMode>())
+	{
+		GameMode->ResetPrototypeObjectives();
+	}
+
+	ResetFeedbackEndTime = World->GetTimeSeconds() + 1.5f;
+}
+
+void APlayerCharacter::RestartPrototype()
+{
+	ResetPrototype();
+}
+
+void APlayerCharacter::RequestPrototypeReset()
+{
+	// Reset is destructive, so R now opens a confirmation instead of firing.
+	if (PrototypeUI)
+	{
+		PrototypeUI->ShowResetConfirmScreen();
+	}
+}
+
+void APlayerCharacter::ConfirmPrototypeReset()
+{
+	ResetPrototype();
+}
+
+void APlayerCharacter::ApplyZombieDamage(const float Damage)
+{
+	UWorld* World = GetWorld();
+
+	if (!World || bPlayerDead || Damage <= 0.0f)
+	{
+		return;
+	}
+
+	LastDamagedTime = World->GetTimeSeconds();
+	CurrentPlayerHealth = FMath::Max(0.0f, CurrentPlayerHealth - Damage);
+
+	// A landed swing also breaks the current pull, so being surrounded costs
+	// the shot the player was lining up.
+	bChargingStone = false;
+	bIsAiming = false;
+
+	// Reuse the existing camera kick so damage reads without a new system.
+	LandingShakeElapsed = 0.0f;
+	LandingShakeStrength = 0.9f;
+
+	if (CurrentPlayerHealth <= 0.0f)
+	{
+		HandlePlayerDeath();
+	}
+}
+
+float APlayerCharacter::GetPlayerHealthPercent() const
+{
+	return FMath::Clamp(
+		CurrentPlayerHealth / FMath::Max(MaxPlayerHealth, KINDA_SMALL_NUMBER),
+		0.0f,
+		1.0f
+	);
+}
+
+float APlayerCharacter::GetTimeSinceDamaged() const
+{
+	const UWorld* World = GetWorld();
+
+	return World
+		? World->GetTimeSeconds() - LastDamagedTime
+		: 1000.0f;
+}
+
+void APlayerCharacter::HandlePlayerDeath()
+{
+	if (bPlayerDead)
+	{
+		return;
+	}
+
+	bPlayerDead = true;
+	bChargingStone = false;
+	bIsAiming = false;
+
+	if (UCharacterMovementComponent* Movement = GetCharacterMovement())
+	{
+		Movement->StopMovementImmediately();
+		Movement->DisableMovement();
+	}
+
+	if (PrototypeUI)
+	{
+		PrototypeUI->ShowGameOverScreen();
+	}
+}
+
+float APlayerCharacter::GetResetFeedbackTimeRemaining() const
+{
+	const UWorld* World = GetWorld();
+	return World
+		? FMath::Max(0.0f, ResetFeedbackEndTime - World->GetTimeSeconds())
+		: 0.0f;
 }
 
 void APlayerCharacter::Move(const FInputActionValue& Value)
@@ -567,8 +843,66 @@ void APlayerCharacter::Look(const FInputActionValue& Value)
 	const FVector2D LookValue =
 		Value.Get<FVector2D>();
 
-	AddControllerYawInput(LookValue.X);
-	AddControllerPitchInput(LookValue.Y);
+	AddControllerYawInput(LookValue.X * LookSensitivity);
+	AddControllerPitchInput(LookValue.Y * LookSensitivity);
+}
+
+void APlayerCharacter::SetLookSensitivity(const float NewSensitivity)
+{
+	LookSensitivity = FMath::Clamp(NewSensitivity, 0.2f, 2.0f);
+}
+
+void APlayerCharacter::SetFirstPersonFieldOfView(const float NewFieldOfView)
+{
+	if (FirstPersonCameraComponent)
+	{
+		FirstPersonCameraComponent->SetFieldOfView(
+			FMath::Clamp(NewFieldOfView, 75.0f, 110.0f)
+		);
+	}
+}
+
+void APlayerCharacter::TogglePauseMenu()
+{
+	TogglePrototypePause();
+}
+
+void APlayerCharacter::InitializePrototypeUI()
+{
+	if (PrototypeUI || !IsLocallyControlled())
+	{
+		return;
+	}
+
+	if (APlayerController* PlayerController =
+		Cast<APlayerController>(GetController()))
+	{
+		PrototypeUI = CreateWidget<UKabulPrototypeUI>(
+			PlayerController,
+			UKabulPrototypeUI::StaticClass()
+		);
+
+		if (PrototypeUI)
+		{
+			PrototypeUI->AddToViewport(100);
+		}
+	}
+}
+
+void APlayerCharacter::TogglePrototypePause()
+{
+	if (PrototypeUI)
+	{
+		PrototypeUI->TogglePauseMenu();
+	}
+}
+
+void APlayerCharacter::ShowPrototypeCompletion()
+{
+	if (PrototypeUI)
+	{
+		PrototypeUI->ShowCompletionScreen();
+	}
 }
 
 void APlayerCharacter::StartJump()
