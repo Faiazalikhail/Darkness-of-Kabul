@@ -211,6 +211,13 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Zombie|AI", meta = (ClampMin = "0"))
 	float DisturbanceRadius = 1800.0f;
 
+	/**
+	 * Distance at which an alerted zombie gives up and returns to unaware.
+	 * 12000 units is 120 metres, so outrunning the group genuinely escapes it.
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Zombie|AI", meta = (ClampMin = "0"))
+	float LoseInterestDistance = 12000.0f;
+
 	/** Seconds between AI sense/decide passes. Kept off the render frame. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Zombie|AI", meta = (ClampMin = "0.02"))
 	float SenseInterval = 0.2f;

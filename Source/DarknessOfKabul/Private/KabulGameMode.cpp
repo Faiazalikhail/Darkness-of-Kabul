@@ -69,7 +69,18 @@ void AKabulGameMode::ResetPrototypeObjectives()
 	for (const TPair<TWeakObjectPtr<AActor>, FTransform>& Entry
 		: WobbleStartTransforms)
 	{
-		if (AActor* WobbleTarget = Entry.Key.Get())
+		AActor* WobbleTarget = Entry.Key.Get();
+
+		if (!WobbleTarget)
+		{
+			continue;
+		}
+
+		// Wobble targets are static props. Restoring a static root logs a
+		// mobility warning and moves nothing, so only restore what can move.
+		const USceneComponent* Root = WobbleTarget->GetRootComponent();
+
+		if (Root && Root->Mobility == EComponentMobility::Movable)
 		{
 			WobbleTarget->SetActorTransform(
 				Entry.Value,

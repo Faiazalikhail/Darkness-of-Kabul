@@ -256,6 +256,22 @@ void AZombieCharacter::UpdateAI()
 
 		AlertToPlayer(PlayerPawn);
 	}
+	else if (FVector::Dist(GetActorLocation(), PlayerPawn->GetActorLocation())
+		> LoseInterestDistance)
+	{
+		// The player has broken away far enough. Give up and go back to
+		// unaware so the zombie can be surprised again later.
+		bAlerted = false;
+		ChaseTarget = nullptr;
+		RefreshMovementSpeed();
+
+		if (AController* ZombieController = GetController())
+		{
+			ZombieController->StopMovement();
+		}
+
+		return;
+	}
 
 	// A staggered zombie is briefly unable to advance or swing.
 	if (PhysicalState == EZombiePhysicalState::Staggered)
@@ -383,7 +399,12 @@ void AZombieCharacter::ReceiveStoneImpact(
 
 	if (HitZone == EZombieHitZone::Torso)
 	{
-		BeginStagger();
+		// A downed zombie stays down. Only a zombie still on its feet can be
+		// staggered, otherwise it would stand up to play the stagger reaction.
+		if (PhysicalState != EZombiePhysicalState::Crawling)
+		{
+			BeginStagger();
+		}
 	}
 	else if (HitZone == EZombieHitZone::Leg)
 	{

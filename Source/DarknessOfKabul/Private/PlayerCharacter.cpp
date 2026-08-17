@@ -357,7 +357,7 @@ void APlayerCharacter::SetupPlayerInputComponent(
 		EKeys::R,
 		IE_Pressed,
 		this,
-		&APlayerCharacter::ResetPrototype
+		&APlayerCharacter::RequestPrototypeReset
 	);
 
 	FInputKeyBinding& PauseBinding = PlayerInputComponent->BindKey(
@@ -703,6 +703,20 @@ void APlayerCharacter::ResetPrototype()
 }
 
 void APlayerCharacter::RestartPrototype()
+{
+	ResetPrototype();
+}
+
+void APlayerCharacter::RequestPrototypeReset()
+{
+	// Reset is destructive, so R now opens a confirmation instead of firing.
+	if (PrototypeUI)
+	{
+		PrototypeUI->ShowResetConfirmScreen();
+	}
+}
+
+void APlayerCharacter::ConfirmPrototypeReset()
 {
 	ResetPrototype();
 }

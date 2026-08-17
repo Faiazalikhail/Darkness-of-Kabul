@@ -58,6 +58,12 @@ public:
 
 	/** Restarts the player, placed targets, objectives, and stones. */
 	void RestartPrototype();
+
+	/** R asks first so a mis-press cannot wipe a run. Opens the prompt. */
+	void RequestPrototypeReset();
+
+	/** Called by the confirmation screen once the player accepts. */
+	void ConfirmPrototypeReset();
 	void TogglePrototypePause();
 	void ShowPrototypeCompletion();
 

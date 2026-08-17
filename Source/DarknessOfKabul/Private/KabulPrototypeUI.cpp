@@ -177,6 +177,7 @@ void UKabulPrototypeUI::BuildInterface()
 	BuildPausePanel();
 	BuildCompletionPanel();
 	BuildGameOverPanel();
+	BuildResetConfirmPanel();
 }
 
 void UKabulPrototypeUI::BuildLoadingPanel()
@@ -342,7 +343,7 @@ void UKabulPrototypeUI::BuildGameplayPanel()
 
 	UTextBlock* Controls = KabulUI::MakeText(
 		WidgetTree,
-		TEXT("RMB AIM  |  HOLD LMB PULL  |  RELEASE FIRE  |  R RESET  |  ESC PAUSE"),
+		TEXT("RMB AIM  |  HOLD LMB PULL  |  RELEASE FIRE  |  SHIFT SPRINT  |  R RESET  |  ESC PAUSE"),
 		11,
 		KabulUI::Muted
 	);
@@ -457,7 +458,7 @@ void UKabulPrototypeUI::BuildGameOverPanel()
 		Column,
 		KabulUI::MakeText(
 			WidgetTree,
-			TEXT("THE HORDE REACHED YOU"),
+			TEXT("THE ZOMBIES REACHED YOU"),
 			17,
 			KabulUI::Text,
 			true
@@ -475,6 +476,66 @@ void UKabulPrototypeUI::BuildGameOverPanel()
 void UKabulPrototypeUI::ShowGameOverScreen()
 {
 	SetScreen(EPrototypeUIScreen::GameOver);
+}
+
+void UKabulPrototypeUI::BuildResetConfirmPanel()
+{
+	UVerticalBox* Column = nullptr;
+	ResetConfirmPanel =
+		KabulUI::MakeCenteredScreen(WidgetTree, RootCanvas, Column);
+	KabulUI::AddIdentity(WidgetTree, Column);
+	KabulUI::AddSpace(WidgetTree, Column, 36.0f);
+	KabulUI::AddToColumn(
+		Column,
+		KabulUI::MakeText(
+			WidgetTree,
+			TEXT("RESET SCENARIO?"),
+			30,
+			KabulUI::Warning,
+			true
+		)
+	);
+	KabulUI::AddToColumn(
+		Column,
+		KabulUI::MakeText(
+			WidgetTree,
+			TEXT("THIS RESTORES YOUR POSITION, ENEMIES, AND PROGRESS"),
+			15,
+			KabulUI::Text,
+			true
+		)
+	);
+	KabulUI::AddSpace(WidgetTree, Column, 20.0f);
+
+	UButton* Confirm = KabulUI::AddButton(WidgetTree, Column, TEXT("YES, RESET"));
+	Confirm->OnClicked.AddDynamic(this, &UKabulPrototypeUI::HandleConfirmReset);
+
+	UButton* Cancel = KabulUI::AddButton(WidgetTree, Column, TEXT("CANCEL"));
+	Cancel->OnClicked.AddDynamic(this, &UKabulPrototypeUI::HandleCancelReset);
+}
+
+void UKabulPrototypeUI::ShowResetConfirmScreen()
+{
+	// Only offer the prompt during play. Menus and the ending own their screens.
+	if (CurrentScreen == EPrototypeUIScreen::Gameplay)
+	{
+		SetScreen(EPrototypeUIScreen::ConfirmReset);
+	}
+}
+
+void UKabulPrototypeUI::HandleConfirmReset()
+{
+	if (APlayerCharacter* Player = GetPlayerCharacter())
+	{
+		Player->ConfirmPrototypeReset();
+	}
+
+	SetScreen(EPrototypeUIScreen::Gameplay);
+}
+
+void UKabulPrototypeUI::HandleCancelReset()
+{
+	SetScreen(EPrototypeUIScreen::Gameplay);
 }
 
 void UKabulPrototypeUI::ShowLoadingScreen()
@@ -528,6 +589,7 @@ void UKabulPrototypeUI::SetScreen(const EPrototypeUIScreen NewScreen)
 		ShowOnly(PausePanel, EPrototypeUIScreen::Paused);
 		ShowOnly(CompletionPanel, EPrototypeUIScreen::Completed);
 		ShowOnly(GameOverPanel, EPrototypeUIScreen::GameOver);
+		ShowOnly(ResetConfirmPanel, EPrototypeUIScreen::ConfirmReset);
 	}
 
 	APlayerController* PlayerController = GetOwningPlayer();
@@ -867,6 +929,12 @@ FReply UKabulPrototypeUI::NativeOnKeyDown(
 		if (CurrentScreen == EPrototypeUIScreen::Settings)
 		{
 			HandleSettingsBack();
+			return FReply::Handled();
+		}
+		if (CurrentScreen == EPrototypeUIScreen::ConfirmReset)
+		{
+			// Escape is the safe answer to a destructive prompt.
+			HandleCancelReset();
 			return FReply::Handled();
 		}
 	}

@@ -19,7 +19,8 @@ enum class EPrototypeUIScreen : uint8
 	Gameplay,
 	Paused,
 	Completed,
-	GameOver
+	GameOver,
+	ConfirmReset
 };
 
 /** Complete native UMG presentation for the target-practice prototype. */
@@ -32,6 +33,7 @@ public:
 	void TogglePauseMenu();
 	void ShowCompletionScreen();
 	void ShowGameOverScreen();
+	void ShowResetConfirmScreen();
 
 protected:
 	virtual void NativeOnInitialized() override;
@@ -68,6 +70,13 @@ private:
 	void BuildPausePanel();
 	void BuildCompletionPanel();
 	void BuildGameOverPanel();
+	void BuildResetConfirmPanel();
+
+	UFUNCTION()
+	void HandleConfirmReset();
+
+	UFUNCTION()
+	void HandleCancelReset();
 	void ShowLoadingScreen();
 	void SetScreen(EPrototypeUIScreen NewScreen);
 	void ApplySettings();
@@ -147,6 +156,9 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UWidget> GameOverPanel;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UWidget> ResetConfirmPanel;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UTextBlock> HealthText;
