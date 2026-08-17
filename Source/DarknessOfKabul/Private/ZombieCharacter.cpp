@@ -6,11 +6,23 @@
 #include "GameFramework/Controller.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "KabulGameMode.h"
+#include "PlayerCharacter.h"
 #include "TimerManager.h"
+
+#include "AIController.h"
+#include "Blueprint/AIBlueprintHelperLibrary.h"
+#include "CollisionQueryParams.h"
+#include "Engine/World.h"
+#include "EngineUtils.h"
+#include "GameFramework/PlayerController.h"
 
 AZombieCharacter::AZombieCharacter()
 {
 	PrimaryActorTick.bCanEverTick = false;
+
+	// Placed zombies must possess an AI controller so navigation can drive them.
+	AIControllerClass = AAIController::StaticClass();
+	AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
 
 	// Stones must pass through the broad navigation capsule and strike the
 	// animated bodies in the mesh's Physics Asset instead.
@@ -57,6 +69,240 @@ void AZombieCharacter::BeginPlay()
 		ECC_GameTraceChannel1,
 		ECR_Block
 	);
+
+	// Sensing runs on its own timer so many placed zombies stay cheap. The
+	// random first delay spreads the cost across frames instead of spiking.
+	GetWorldTimerManager().SetTimer(
+		AISenseTimerHandle,
+		this,
+		&AZombieCharacter::UpdateAI,
+		FMath::Max(0.02f, SenseInterval),
+		true,
+		FMath::FRandRange(0.0f, SenseInterval)
+	);
+}
+
+APawn* AZombieCharacter::FindPlayerPawn() const
+{
+	const UWorld* World = GetWorld();
+	APlayerController* PlayerController =
+		World ? World->GetFirstPlayerController() : nullptr;
+
+	return PlayerController ? PlayerController->GetPawn() : nullptr;
+}
+
+bool AZombieCharacter::IsChasing() const
+{
+	return bAlerted
+		&& PhysicalState != EZombiePhysicalState::Dead
+		&& PhysicalState != EZombiePhysicalState::Staggered;
+}
+
+void AZombieCharacter::RefreshMovementSpeed()
+{
+	UCharacterMovementComponent* Movement = GetCharacterMovement();
+
+	if (!Movement)
+	{
+		return;
+	}
+
+	if (PhysicalState == EZombiePhysicalState::Crawling)
+	{
+		Movement->MaxWalkSpeed = CrawlingMaxSpeed;
+		return;
+	}
+
+	// Alerted zombies close distance quickly; idle ones keep the placed speed.
+	Movement->MaxWalkSpeed = bAlerted
+		? ChaseMaxWalkSpeed
+		: StandingMaxWalkSpeed;
+}
+
+bool AZombieCharacter::CanSeePlayer(const APawn* PlayerPawn) const
+{
+	const UWorld* World = GetWorld();
+
+	if (!World || !PlayerPawn)
+	{
+		return false;
+	}
+
+	const FVector EyeLocation = GetActorLocation();
+	const FVector PlayerLocation = PlayerPawn->GetActorLocation();
+	const FVector ToPlayer = PlayerLocation - EyeLocation;
+
+	if (ToPlayer.SizeSquared() > FMath::Square(SightRange))
+	{
+		return false;
+	}
+
+	// Forward vision cone. A zombie cannot notice the player behind its back.
+	const FVector DirectionToPlayer = ToPlayer.GetSafeNormal();
+	const float CosineLimit =
+		FMath::Cos(FMath::DegreesToRadians(SightHalfAngleDegrees));
+
+	if (FVector::DotProduct(GetActorForwardVector(), DirectionToPlayer)
+		< CosineLimit)
+	{
+		return false;
+	}
+
+	// Walls block sight, so the player can break line of sight to stay hidden.
+	FCollisionQueryParams QueryParameters(
+		SCENE_QUERY_STAT(ZombieSight),
+		false,
+		this
+	);
+	QueryParameters.AddIgnoredActor(PlayerPawn);
+
+	FHitResult Blocking;
+	const bool bBlocked = World->LineTraceSingleByChannel(
+		Blocking,
+		EyeLocation,
+		PlayerLocation,
+		ECC_Visibility,
+		QueryParameters
+	);
+
+	return !bBlocked;
+}
+
+void AZombieCharacter::AlertToPlayer(APawn* PlayerPawn)
+{
+	if (PhysicalState == EZombiePhysicalState::Dead || !PlayerPawn)
+	{
+		return;
+	}
+
+	ChaseTarget = PlayerPawn;
+
+	if (bAlerted)
+	{
+		return;
+	}
+
+	bAlerted = true;
+	RefreshMovementSpeed();
+	BP_OnZombieAlerted();
+}
+
+void AZombieCharacter::RaiseDisturbance(APawn* PlayerPawn)
+{
+	UWorld* World = GetWorld();
+
+	if (!World || !PlayerPawn)
+	{
+		return;
+	}
+
+	const FVector Origin = GetActorLocation();
+	const float RadiusSquared = FMath::Square(DisturbanceRadius);
+
+	// Only the local group reacts. Zombies beyond the radius stay unaware, so
+	// striking one of four pulls its neighbours and not the whole level.
+	for (TActorIterator<AZombieCharacter> It(World); It; ++It)
+	{
+		AZombieCharacter* Other = *It;
+
+		if (!Other || Other == this)
+		{
+			continue;
+		}
+
+		if (FVector::DistSquared(Origin, Other->GetActorLocation())
+			<= RadiusSquared)
+		{
+			Other->AlertToPlayer(PlayerPawn);
+		}
+	}
+}
+
+void AZombieCharacter::UpdateAI()
+{
+	UWorld* World = GetWorld();
+
+	if (!World || PhysicalState == EZombiePhysicalState::Dead)
+	{
+		return;
+	}
+
+	APawn* PlayerPawn = ChaseTarget.Get();
+
+	if (!PlayerPawn)
+	{
+		PlayerPawn = FindPlayerPawn();
+	}
+
+	APlayerCharacter* Player = Cast<APlayerCharacter>(PlayerPawn);
+
+	// A dead player ends the chase so bodies do not keep swinging at a corpse.
+	if (!PlayerPawn || (Player && Player->IsPlayerDead()))
+	{
+		if (AController* ZombieController = GetController())
+		{
+			ZombieController->StopMovement();
+		}
+
+		return;
+	}
+
+	if (!bAlerted)
+	{
+		if (!CanSeePlayer(PlayerPawn))
+		{
+			return;
+		}
+
+		AlertToPlayer(PlayerPawn);
+	}
+
+	// A staggered zombie is briefly unable to advance or swing.
+	if (PhysicalState == EZombiePhysicalState::Staggered)
+	{
+		if (AController* ZombieController = GetController())
+		{
+			ZombieController->StopMovement();
+		}
+
+		return;
+	}
+
+	const float Distance = FVector::Dist(
+		GetActorLocation(),
+		PlayerPawn->GetActorLocation()
+	);
+
+	if (Distance > AttackRange)
+	{
+		UAIBlueprintHelperLibrary::SimpleMoveToActor(
+			GetController(),
+			PlayerPawn
+		);
+
+		return;
+	}
+
+	// In range: stop closing and swing on the attack interval.
+	if (AController* ZombieController = GetController())
+	{
+		ZombieController->StopMovement();
+	}
+
+	const float Now = World->GetTimeSeconds();
+
+	if (Now - LastAttackTime < AttackInterval)
+	{
+		return;
+	}
+
+	LastAttackTime = Now;
+	BP_OnZombieAttack(PlayerPawn->GetActorLocation());
+
+	if (Player)
+	{
+		Player->ApplyZombieDamage(AttackDamage);
+	}
 }
 
 void AZombieCharacter::ReceiveStoneImpact(
@@ -120,6 +366,14 @@ void AZombieCharacter::ReceiveStoneImpact(
 		Damage,
 		ImpactPoint
 	);
+
+	// Being struck is a disturbance: this zombie and its nearby group wake up
+	// and converge, even when the stone arrived from outside their vision.
+	if (APawn* PlayerPawn = FindPlayerPawn())
+	{
+		AlertToPlayer(PlayerPawn);
+		RaiseDisturbance(PlayerPawn);
+	}
 
 	if (HitZone == EZombieHitZone::Head || CurrentHealth <= 0.0f)
 	{
@@ -206,11 +460,10 @@ void AZombieCharacter::EndStagger()
 	if (UCharacterMovementComponent* Movement = GetCharacterMovement())
 	{
 		Movement->SetMovementMode(MOVE_Walking);
-		Movement->MaxWalkSpeed =
-			StateBeforeStagger == EZombiePhysicalState::Crawling
-				? CrawlingMaxSpeed
-				: StandingMaxWalkSpeed;
 	}
+
+	// Restores crawl speed, chase speed, or the placed walk speed as applicable.
+	RefreshMovementSpeed();
 }
 
 void AZombieCharacter::EnterCrawling()
@@ -341,6 +594,16 @@ void AZombieCharacter::ResetReactionState()
 	LastHitZone = EZombieHitZone::Torso;
 	StateBeforeStagger = EZombiePhysicalState::Standing;
 	SetPhysicalState(EZombiePhysicalState::Standing);
+
+	// Reset returns every zombie to unaware so the scenario restarts calmly.
+	bAlerted = false;
+	ChaseTarget = nullptr;
+	LastAttackTime = -1000.0f;
+
+	if (AController* ZombieController = GetController())
+	{
+		ZombieController->StopMovement();
+	}
 
 	if (UCharacterMovementComponent* Movement = GetCharacterMovement())
 	{

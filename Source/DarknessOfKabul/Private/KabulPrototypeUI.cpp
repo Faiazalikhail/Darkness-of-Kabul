@@ -176,6 +176,7 @@ void UKabulPrototypeUI::BuildInterface()
 	BuildGameplayPanel();
 	BuildPausePanel();
 	BuildCompletionPanel();
+	BuildGameOverPanel();
 }
 
 void UKabulPrototypeUI::BuildLoadingPanel()
@@ -327,6 +328,18 @@ void UKabulPrototypeUI::BuildGameplayPanel()
 	ObjectiveSlot->SetPosition(FVector2D(28.0f, 78.0f));
 	ObjectiveSlot->SetAutoSize(true);
 
+	HealthText = KabulUI::MakeText(
+		WidgetTree,
+		TEXT("HEALTH 100%"),
+		14,
+		KabulUI::Accent,
+		true
+	);
+	HealthText->SetJustification(ETextJustify::Left);
+	UCanvasPanelSlot* HealthSlot = Panel->AddChildToCanvas(HealthText);
+	HealthSlot->SetPosition(FVector2D(28.0f, 100.0f));
+	HealthSlot->SetAutoSize(true);
+
 	UTextBlock* Controls = KabulUI::MakeText(
 		WidgetTree,
 		TEXT("RMB AIM  |  HOLD LMB PULL  |  RELEASE FIRE  |  R RESET  |  ESC PAUSE"),
@@ -424,6 +437,46 @@ void UKabulPrototypeUI::BuildCompletionPanel()
 	Leave->OnClicked.AddDynamic(this, &UKabulPrototypeUI::HandleQuit);
 }
 
+void UKabulPrototypeUI::BuildGameOverPanel()
+{
+	UVerticalBox* Column = nullptr;
+	GameOverPanel = KabulUI::MakeCenteredScreen(WidgetTree, RootCanvas, Column);
+	KabulUI::AddIdentity(WidgetTree, Column);
+	KabulUI::AddSpace(WidgetTree, Column, 36.0f);
+	KabulUI::AddToColumn(
+		Column,
+		KabulUI::MakeText(
+			WidgetTree,
+			TEXT("YOU WERE OVERRUN"),
+			32,
+			KabulUI::Warning,
+			true
+		)
+	);
+	KabulUI::AddToColumn(
+		Column,
+		KabulUI::MakeText(
+			WidgetTree,
+			TEXT("THE HORDE REACHED YOU"),
+			17,
+			KabulUI::Text,
+			true
+		)
+	);
+	KabulUI::AddSpace(WidgetTree, Column, 20.0f);
+
+	UButton* PlayAgain = KabulUI::AddButton(WidgetTree, Column, TEXT("TRY AGAIN"));
+	PlayAgain->OnClicked.AddDynamic(this, &UKabulPrototypeUI::HandleNewGame);
+
+	UButton* Leave = KabulUI::AddButton(WidgetTree, Column, TEXT("LEAVE"));
+	Leave->OnClicked.AddDynamic(this, &UKabulPrototypeUI::HandleQuit);
+}
+
+void UKabulPrototypeUI::ShowGameOverScreen()
+{
+	SetScreen(EPrototypeUIScreen::GameOver);
+}
+
 void UKabulPrototypeUI::ShowLoadingScreen()
 {
 	LoadingStartTime = FPlatformTime::Seconds();
@@ -474,6 +527,7 @@ void UKabulPrototypeUI::SetScreen(const EPrototypeUIScreen NewScreen)
 		);
 		ShowOnly(PausePanel, EPrototypeUIScreen::Paused);
 		ShowOnly(CompletionPanel, EPrototypeUIScreen::Completed);
+		ShowOnly(GameOverPanel, EPrototypeUIScreen::GameOver);
 	}
 
 	APlayerController* PlayerController = GetOwningPlayer();
@@ -563,6 +617,29 @@ void UKabulPrototypeUI::UpdateGameplayReadout()
 				? TEXT("SCENARIO RESET")
 				: (bReady ? TEXT("READY") : TEXT("HOLD LMB TO PULL"))
 		));
+	}
+
+	if (HealthText)
+	{
+		const APlayerCharacter* HealthOwner = GetPlayerCharacter();
+
+		if (HealthOwner)
+		{
+			const float HealthPercent = HealthOwner->GetPlayerHealthPercent();
+
+			HealthText->SetText(FText::FromString(FString::Printf(
+				TEXT("HEALTH %d%%"),
+				FMath::RoundToInt(HealthPercent * 100.0f)
+			)));
+
+			// Recent damage flashes; low health stays red as a standing warning.
+			const bool bRecentlyHit = HealthOwner->GetTimeSinceDamaged() < 0.25f;
+			HealthText->SetColorAndOpacity(
+				(bRecentlyHit || HealthPercent <= 0.35f)
+					? KabulUI::Warning
+					: KabulUI::Accent
+			);
+		}
 	}
 
 	if (ObjectiveText)

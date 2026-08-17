@@ -111,6 +111,8 @@ void APlayerCharacter::BeginPlay()
 		? Controller->GetControlRotation()
 		: GetActorRotation();
 
+	CurrentPlayerHealth = MaxPlayerHealth;
+
 	UpdateLocomotionState();
 }
 
@@ -656,6 +658,12 @@ void APlayerCharacter::ResetPrototype()
 	LandingShakeElapsed = 0.0f;
 	LandingShakeStrength = 0.0f;
 
+	// Revive the player so reset also recovers from a game over.
+	CurrentPlayerHealth = MaxPlayerHealth;
+	bPlayerDead = false;
+	LastDamagedTime = -1000.0f;
+
+	GetCharacterMovement()->SetMovementMode(MOVE_Walking);
 	GetCharacterMovement()->StopMovementImmediately();
 	SetActorTransform(
 		InitialPlayerTransform,
@@ -697,6 +705,74 @@ void APlayerCharacter::ResetPrototype()
 void APlayerCharacter::RestartPrototype()
 {
 	ResetPrototype();
+}
+
+void APlayerCharacter::ApplyZombieDamage(const float Damage)
+{
+	UWorld* World = GetWorld();
+
+	if (!World || bPlayerDead || Damage <= 0.0f)
+	{
+		return;
+	}
+
+	LastDamagedTime = World->GetTimeSeconds();
+	CurrentPlayerHealth = FMath::Max(0.0f, CurrentPlayerHealth - Damage);
+
+	// A landed swing also breaks the current pull, so being surrounded costs
+	// the shot the player was lining up.
+	bChargingStone = false;
+	bIsAiming = false;
+
+	// Reuse the existing camera kick so damage reads without a new system.
+	LandingShakeElapsed = 0.0f;
+	LandingShakeStrength = 0.9f;
+
+	if (CurrentPlayerHealth <= 0.0f)
+	{
+		HandlePlayerDeath();
+	}
+}
+
+float APlayerCharacter::GetPlayerHealthPercent() const
+{
+	return FMath::Clamp(
+		CurrentPlayerHealth / FMath::Max(MaxPlayerHealth, KINDA_SMALL_NUMBER),
+		0.0f,
+		1.0f
+	);
+}
+
+float APlayerCharacter::GetTimeSinceDamaged() const
+{
+	const UWorld* World = GetWorld();
+
+	return World
+		? World->GetTimeSeconds() - LastDamagedTime
+		: 1000.0f;
+}
+
+void APlayerCharacter::HandlePlayerDeath()
+{
+	if (bPlayerDead)
+	{
+		return;
+	}
+
+	bPlayerDead = true;
+	bChargingStone = false;
+	bIsAiming = false;
+
+	if (UCharacterMovementComponent* Movement = GetCharacterMovement())
+	{
+		Movement->StopMovementImmediately();
+		Movement->DisableMovement();
+	}
+
+	if (PrototypeUI)
+	{
+		PrototypeUI->ShowGameOverScreen();
+	}
 }
 
 float APlayerCharacter::GetResetFeedbackTimeRemaining() const

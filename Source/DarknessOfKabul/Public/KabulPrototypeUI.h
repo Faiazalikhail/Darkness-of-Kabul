@@ -18,7 +18,8 @@ enum class EPrototypeUIScreen : uint8
 	Settings,
 	Gameplay,
 	Paused,
-	Completed
+	Completed,
+	GameOver
 };
 
 /** Complete native UMG presentation for the target-practice prototype. */
@@ -30,6 +31,7 @@ class DARKNESSOFKABUL_API UKabulPrototypeUI : public UUserWidget
 public:
 	void TogglePauseMenu();
 	void ShowCompletionScreen();
+	void ShowGameOverScreen();
 
 protected:
 	virtual void NativeOnInitialized() override;
@@ -65,6 +67,7 @@ private:
 	void BuildGameplayPanel();
 	void BuildPausePanel();
 	void BuildCompletionPanel();
+	void BuildGameOverPanel();
 	void ShowLoadingScreen();
 	void SetScreen(EPrototypeUIScreen NewScreen);
 	void ApplySettings();
@@ -141,6 +144,12 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UWidget> CompletionPanel;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UWidget> GameOverPanel;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UTextBlock> HealthText;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UTextBlock> ObjectiveText;

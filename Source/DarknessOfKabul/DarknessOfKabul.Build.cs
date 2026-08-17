@@ -13,7 +13,9 @@ public class DarknessOfKabul : ModuleRules
 			"Engine",
 			"InputCore",
 			"EnhancedInput",
-			"UMG"
+			"UMG",
+			"AIModule",
+			"NavigationSystem"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[]

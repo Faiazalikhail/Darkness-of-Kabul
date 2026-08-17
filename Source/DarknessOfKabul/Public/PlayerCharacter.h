@@ -61,6 +61,22 @@ public:
 	void TogglePrototypePause();
 	void ShowPrototypeCompletion();
 
+	/** Applies one zombie swing. Reaching zero health ends the run. */
+	UFUNCTION(BlueprintCallable, Category = "Player|Health")
+	void ApplyZombieDamage(float Damage);
+
+	/** Remaining health from 0 to 1, for the HUD bar. */
+	UFUNCTION(BlueprintPure, Category = "Player|Health")
+	float GetPlayerHealthPercent() const;
+
+	/** True once the player has been killed and the run is over. */
+	UFUNCTION(BlueprintPure, Category = "Player|Health")
+	bool IsPlayerDead() const { return bPlayerDead; }
+
+	/** Seconds since the last swing landed. Drives the HUD damage flash. */
+	UFUNCTION(BlueprintPure, Category = "Player|Health")
+	float GetTimeSinceDamaged() const;
+
 	/** Multiplier reserved for future footsteps or AI hearing. Crouching is quietest. */
 	UFUNCTION(BlueprintPure, Category = "Movement|Noise")
 	float GetMovementNoiseMultiplier() const { return MovementNoiseMultiplier; }
@@ -188,6 +204,20 @@ private:
 	) const;
 	void ResetPrototype();
 	void InitializePrototypeUI();
+
+	/** Player health. Zombie swings are the only source of damage. */
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Player|Health",
+		meta = (AllowPrivateAccess = "true", ClampMin = "1.0")
+	)
+	float MaxPlayerHealth = 100.0f;
+
+	float CurrentPlayerHealth = 100.0f;
+	bool bPlayerDead = false;
+	float LastDamagedTime = -1000.0f;
+	void HandlePlayerDeath();
 
 	float ResetFeedbackEndTime = 0.0f;
 	float LookSensitivity = 1.0f;
