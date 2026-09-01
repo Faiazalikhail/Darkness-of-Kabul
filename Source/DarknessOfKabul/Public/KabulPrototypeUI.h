@@ -80,6 +80,9 @@ private:
 	void ShowLoadingScreen();
 	void SetScreen(EPrototypeUIScreen NewScreen);
 	void ApplySettings();
+	/** Restores the three menu choices that are not part of GameUserSettings. */
+	void LoadSettings();
+	void SaveSettings() const;
 	class APlayerCharacter* GetPlayerCharacter() const;
 	void UpdateGameplayReadout();
 	void DrawLine(

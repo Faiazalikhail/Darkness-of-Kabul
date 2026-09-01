@@ -5,6 +5,7 @@
 #include "Engine/Engine.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "HealthComponent.h"
 #include "KabulGameMode.h"
 #include "PlayerCharacter.h"
 #include "TimerManager.h"
@@ -19,6 +20,8 @@
 AZombieCharacter::AZombieCharacter()
 {
 	PrimaryActorTick.bCanEverTick = false;
+
+	Health = CreateDefaultSubobject<UHealthComponent>(TEXT("Health"));
 
 	// Placed zombies must possess an AI controller so navigation can drive them.
 	AIControllerClass = AAIController::StaticClass();
@@ -42,7 +45,8 @@ void AZombieCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
-	CurrentHealth = MaxHealth;
+	Health->InitializeHealth(MaxHealth);
+	CurrentHealth = Health->GetCurrentHealth();
 	PhysicalState = EZombiePhysicalState::Standing;
 	InitialActorTransform = GetActorTransform();
 	InitialMeshRelativeTransform = GetMesh()->GetRelativeTransform();
@@ -349,28 +353,17 @@ void AZombieCharacter::ReceiveStoneImpact(
 		ClassifyHitBone(ResolvedHit.BoneName);
 	LastHitZone = HitZone;
 
-	float Damage = 0.0f;
+	// A head hit is lethal by rule rather than by damage value, so it empties
+	// the pool regardless of how much health is left.
+	const float Damage = HitZone == EZombieHitZone::Head
+		? Health->ApplyLethalDamage()
+		: Health->ApplyDamage(
+			HitZone == EZombieHitZone::Torso ? TorsoDamage
+			: HitZone == EZombieHitZone::Arm ? ArmDamage
+			: LegDamage
+		);
 
-	switch (HitZone)
-	{
-	case EZombieHitZone::Head:
-		Damage = CurrentHealth;
-		break;
-
-	case EZombieHitZone::Torso:
-		Damage = TorsoDamage;
-		break;
-
-	case EZombieHitZone::Arm:
-		Damage = ArmDamage;
-		break;
-
-	case EZombieHitZone::Leg:
-		Damage = LegDamage;
-		break;
-	}
-
-	CurrentHealth = FMath::Max(0.0f, CurrentHealth - Damage);
+	CurrentHealth = Health->GetCurrentHealth();
 	const FVector ImpactPoint = ResolvedHit.bBlockingHit
 		? ResolvedHit.ImpactPoint
 		: GetActorLocation();
@@ -391,7 +384,7 @@ void AZombieCharacter::ReceiveStoneImpact(
 		RaiseDisturbance(PlayerPawn);
 	}
 
-	if (HitZone == EZombieHitZone::Head || CurrentHealth <= 0.0f)
+	if (HitZone == EZombieHitZone::Head || Health->IsDepleted())
 	{
 		Die(HitZone, ResolvedHit, ImpactVelocity);
 		return;
@@ -611,7 +604,8 @@ void AZombieCharacter::ResetReactionState()
 		ETeleportType::TeleportPhysics
 	);
 
-	CurrentHealth = MaxHealth;
+	Health->ResetHealth();
+	CurrentHealth = Health->GetCurrentHealth();
 	LastHitZone = EZombieHitZone::Torso;
 	StateBeforeStagger = EZombiePhysicalState::Standing;
 	SetPhysicalState(EZombiePhysicalState::Standing);

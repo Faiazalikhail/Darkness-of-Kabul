@@ -11,6 +11,7 @@ class UCameraComponent;
 class USkeletalMeshComponent;
 class USlingshotAimGuideComponent;
 class UKabulPrototypeUI;
+class UHealthComponent;
 class AStoneProjectile;
 struct FInputActionValue;
 
@@ -220,7 +221,10 @@ private:
 	)
 	float MaxPlayerHealth = 100.0f;
 
-	float CurrentPlayerHealth = 100.0f;
+	/** Shared damage pool. The zombies use the same component type. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Player|Health", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UHealthComponent> Health;
+
 	bool bPlayerDead = false;
 	float LastDamagedTime = -1000.0f;
 	void HandlePlayerDeath();

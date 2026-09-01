@@ -51,3 +51,8 @@ _CleanupReview/
 # Reproducible portfolio package output; keep BUILD_NOTES.md tracked.
 /deliverables/windows/DarknessOfKabul_Windows_Portfolio/
 /deliverables/windows/*.zip
+
+# Editor- and IDE-generated files that must never enter this repository.
+.claude/
+.github/copilot-instructions.md
+/Plugins/VisualStudioTools/

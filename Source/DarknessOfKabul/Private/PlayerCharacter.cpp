@@ -12,6 +12,7 @@
 #include "InputCoreTypes.h"
 #include "InputMappingContext.h"
 #include "KinematicsLibrary.h"
+#include "HealthComponent.h"
 #include "KabulGameMode.h"
 #include "KabulPrototypeUI.h"
 #include "Kismet/GameplayStatics.h"
@@ -63,6 +64,8 @@ APlayerCharacter::APlayerCharacter()
 	Mesh1P->CastShadow = false;
 	Mesh1P->SetRelativeLocation(FVector(-30.0f, 0.0f, -150.0f));
 
+	Health = CreateDefaultSubobject<UHealthComponent>(TEXT("Health"));
+
 	// The guide is calculation and drawing only. It does not attach to the
 	// camera, so it cannot alter the working camera hierarchy.
 	SlingshotAimGuide =
@@ -111,7 +114,7 @@ void APlayerCharacter::BeginPlay()
 		? Controller->GetControlRotation()
 		: GetActorRotation();
 
-	CurrentPlayerHealth = MaxPlayerHealth;
+	Health->InitializeHealth(MaxPlayerHealth);
 
 	UpdateLocomotionState();
 }
@@ -659,7 +662,7 @@ void APlayerCharacter::ResetPrototype()
 	LandingShakeStrength = 0.0f;
 
 	// Revive the player so reset also recovers from a game over.
-	CurrentPlayerHealth = MaxPlayerHealth;
+	Health->ResetHealth();
 	bPlayerDead = false;
 	LastDamagedTime = -1000.0f;
 
@@ -731,7 +734,7 @@ void APlayerCharacter::ApplyZombieDamage(const float Damage)
 	}
 
 	LastDamagedTime = World->GetTimeSeconds();
-	CurrentPlayerHealth = FMath::Max(0.0f, CurrentPlayerHealth - Damage);
+	Health->ApplyDamage(Damage);
 
 	// A landed swing also breaks the current pull, so being surrounded costs
 	// the shot the player was lining up.
@@ -742,7 +745,7 @@ void APlayerCharacter::ApplyZombieDamage(const float Damage)
 	LandingShakeElapsed = 0.0f;
 	LandingShakeStrength = 0.9f;
 
-	if (CurrentPlayerHealth <= 0.0f)
+	if (Health->IsDepleted())
 	{
 		HandlePlayerDeath();
 	}
@@ -750,11 +753,7 @@ void APlayerCharacter::ApplyZombieDamage(const float Damage)
 
 float APlayerCharacter::GetPlayerHealthPercent() const
 {
-	return FMath::Clamp(
-		CurrentPlayerHealth / FMath::Max(MaxPlayerHealth, KINDA_SMALL_NUMBER),
-		0.0f,
-		1.0f
-	);
+	return Health->GetHealthPercent();
 }
 
 float APlayerCharacter::GetTimeSinceDamaged() const

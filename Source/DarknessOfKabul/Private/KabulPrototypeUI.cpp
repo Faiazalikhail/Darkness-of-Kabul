@@ -20,6 +20,7 @@
 #include "InputCoreTypes.h"
 #include "KabulGameMode.h"
 #include "Kismet/KismetSystemLibrary.h"
+#include "Misc/ConfigCacheIni.h"
 #include "PlayerCharacter.h"
 #include "Rendering/DrawElementTypes.h"
 #include "Styling/CoreStyle.h"
@@ -35,6 +36,10 @@ namespace KabulUI
 		TEXT("LOW"), TEXT("NORMAL"), TEXT("HIGH")
 	};
 	constexpr float FieldOfViewValues[] = {80.0f, 90.0f, 105.0f};
+
+	constexpr int32 VolumeOptionCount = UE_ARRAY_COUNT(VolumeValues);
+	constexpr int32 SensitivityOptionCount = UE_ARRAY_COUNT(SensitivityValues);
+	constexpr int32 FieldOfViewOptionCount = UE_ARRAY_COUNT(FieldOfViewValues);
 
 	const FLinearColor Background(0.018f, 0.024f, 0.032f, 0.96f);
 	const FLinearColor Panel(0.055f, 0.065f, 0.078f, 0.98f);
@@ -153,6 +158,8 @@ void UKabulPrototypeUI::NativeOnInitialized()
 		bFullscreen = GEngine->GetGameUserSettings()->GetFullscreenMode()
 			!= EWindowMode::Windowed;
 	}
+
+	LoadSettings();
 
 	BuildInterface();
 }
@@ -1076,4 +1083,42 @@ void UKabulPrototypeUI::ApplySettings()
 			KabulUI::FieldOfViewValues[FieldOfViewIndex]
 		);
 	}
+
+	SaveSettings();
+}
+
+namespace
+{
+	/** Where the three menu choices live between sessions. */
+	const TCHAR* const SettingsSection = TEXT("KabulPrototype.Settings");
+}
+
+void UKabulPrototypeUI::LoadSettings()
+{
+	if (!GConfig)
+	{
+		return;
+	}
+
+	// Missing entries leave the constructor defaults untouched.
+	GConfig->GetInt(SettingsSection, TEXT("VolumeIndex"), VolumeIndex, GGameUserSettingsIni);
+	GConfig->GetInt(SettingsSection, TEXT("SensitivityIndex"), SensitivityIndex, GGameUserSettingsIni);
+	GConfig->GetInt(SettingsSection, TEXT("FieldOfViewIndex"), FieldOfViewIndex, GGameUserSettingsIni);
+
+	VolumeIndex = FMath::Clamp(VolumeIndex, 0, KabulUI::VolumeOptionCount - 1);
+	SensitivityIndex = FMath::Clamp(SensitivityIndex, 0, KabulUI::SensitivityOptionCount - 1);
+	FieldOfViewIndex = FMath::Clamp(FieldOfViewIndex, 0, KabulUI::FieldOfViewOptionCount - 1);
+}
+
+void UKabulPrototypeUI::SaveSettings() const
+{
+	if (!GConfig)
+	{
+		return;
+	}
+
+	GConfig->SetInt(SettingsSection, TEXT("VolumeIndex"), VolumeIndex, GGameUserSettingsIni);
+	GConfig->SetInt(SettingsSection, TEXT("SensitivityIndex"), SensitivityIndex, GGameUserSettingsIni);
+	GConfig->SetInt(SettingsSection, TEXT("FieldOfViewIndex"), FieldOfViewIndex, GGameUserSettingsIni);
+	GConfig->Flush(false, GGameUserSettingsIni);
 }

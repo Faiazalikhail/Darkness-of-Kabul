@@ -4,6 +4,8 @@
 #include "GameFramework/Character.h"
 #include "ZombieCharacter.generated.h"
 
+class UHealthComponent;
+
 /** Body region resolved from the Physics Asset bone struck by a stone. */
 UENUM(BlueprintType)
 enum class EZombieHitZone : uint8
@@ -74,12 +76,20 @@ protected:
 	)
 	float MaxHealth = 100.0f;
 
+	/**
+	 * Read-only mirror of the health component, kept so existing Blueprints
+	 * and the inspector can still display it. The component holds the truth.
+	 */
 	UPROPERTY(
 		VisibleInstanceOnly,
 		BlueprintReadOnly,
 		Category = "Zombie|Damage"
 	)
 	float CurrentHealth = 100.0f;
+
+	/** Shared damage pool. The player uses the same component type. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Zombie|Damage")
+	TObjectPtr<UHealthComponent> Health;
 
 	UPROPERTY(
 		EditDefaultsOnly,
